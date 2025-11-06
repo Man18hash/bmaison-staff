@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B Maison — Manager Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{ --bg:#f3f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --accent:#f5c518; --brand:#111827; --border:#e5e7eb; --content-max:1320px }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg)}
+    html{scroll-behavior:smooth}
+
+    /* Layout */
+    .layout{display:flex; min-height:100vh; position:relative}
+    aside{background:var(--brand); color:#e5e7eb; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; z-index:50; box-shadow:2px 0 8px rgba(0,0,0,.1)}
+    aside.open{transform:translateX(0)}
+    main{flex:1; width:100%; margin-left:0; transition:margin-left .25s ease}
+    .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:40}
+    .backdrop.show{display:block}
+    @media (min-width: 960px){ 
+      aside{position:fixed; transform:translateX(0)}
+      main{margin-left:260px}
+      .backdrop{display:none!important}
+      header .menu{display:none}
+    }
+
+    /* Sidebar */
+    .logo{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06); flex-shrink:0}
+    .logo span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:12px}
+    .nav{padding:8px; flex:1; overflow-y:auto}
+    .nav a{display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:12px; color:#d1d5db; text-decoration:none}
+    .nav a:hover{background:#1f2937; color:#fff}
+    .nav a.active{background:#0b1220; color:#fff}
+    .push-bottom{margin-top:auto; padding:8px; flex-shrink:0; border-top:1px solid rgba(255,255,255,.06)}
+    .logout{display:flex; gap:10px; align-items:center; padding:10px 12px; color:#fecaca; text-decoration:none; border-radius:12px}
+    .logout:hover{background:#331f1f}
+
+    /* Main */
+    main{padding:18px 20px; min-height:100vh}
+    .container{margin:0 auto; width:100%; padding:0 10px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0}
+    header .menu{display:inline-flex; background:var(--panel); border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer}
+
+    /* Cards */
+    .kpis{display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-bottom:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow:0 4px 14px rgba(0,0,0,.04); display:flex; flex-direction:column}
+    .title{font-size:13px; color:var(--muted); margin:0 0 6px}
+    .big{font-size:26px; font-weight:800}
+    .delta{font-size:12px; color:#16a34a}
+    .bad{color:#dc2626}
+
+    /* Grid sections */
+    .grid{display:grid; gap:16px; grid-template-columns:repeat(12, 1fr)}
+    .span-6{grid-column:span 12}
+    .span-4{grid-column:span 12}
+    .span-3{grid-column:span 12}
+    @media (min-width: 960px){ .span-6{grid-column:span 6} .span-4{grid-column:span 4} .span-3{grid-column:span 3} }
+
+    /* Chart area fixes */
+    .chart-wrapper{position:relative; width:100%; height:280px; margin-top:8px}
+    @media (min-width:1200px){ .chart-wrapper{height:320px} }
+    canvas{width:100%!important; height:100%!important; display:block}
+    .table{width:100%; border-collapse:collapse; font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border); padding:10px; text-align:left}
+    .table th{font-size:12px; color:var(--muted)}
+
+    .badge{display:inline-flex; align-items:center; gap:6px; background:#fff7d6; color:#7a5b00; padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid #fde68a}
+    /* Modern inputs */
+    label{font-size:12px; color:var(--muted); display:block; margin:0 0 6px}
+    input, select, textarea{width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:#fff; transition:border-color .15s, box-shadow .15s}
+    input:focus, select:focus, textarea:focus{outline:none; border-color:#94a3b8; box-shadow:0 0 0 3px rgba(148,163,184,.25)}
+    button{padding:10px 14px; border:1px solid var(--border); background:#fff; border-radius:12px; cursor:pointer; transition:transform .05s ease, filter .15s}
+    button:active{transform:translateY(1px)}
+    button.primary{background:#111827; color:#fff; border-color:#111827}
+    .row.gap-sm{gap:8px}
+    .help{font-size:12px; color:var(--muted); margin-top:4px}
+    .msg{font-size:13px; margin-top:8px}
+    .msg.good{color:#065f46}
+    .msg.bad{color:#9f1239}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar">
+    <div class="logo"><span>B MAISON HOTEL</span></div>
+    <nav class="nav">
+      <a class="active" href="#top">🏠 Manager</a>
+      <a href="#clients">👤 Clients</a>
+      <a href="#maintenance">🛠 Maintenance</a>
+      <a href="#analytics">📈 Analytics</a>
+    </nav>
+    <div class="push-bottom">
+      <a class="logout" href="index.html">↩ Logout</a>
+    </div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="top"><div class="container">
+    <header>
+      <h1>Manager Overview</h1>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <!-- Simple Analytics -->
+    <section class="kpis" id="analytics">
+      <div class="card"><div class="title">Guests Today</div><div class="big" id="aGuests">—</div></div>
+      <div class="card"><div class="title">Rooms Dirty</div><div class="big" id="aDirty">—</div></div>
+      <div class="card"><div class="title">Open Tickets</div><div class="big" id="aTickets">—</div></div>
+      <div class="card"><div class="title">Payments Today</div><div class="big" id="aPayments">₱ 0</div></div>
+    </section>
+
+    <!-- Operational Summaries -->
+    <section class="grid" id="summaries" style="margin-top:16px">
+      <article class="card span-4">
+        <div class="title">Inventory — Material Summary</div>
+        <div style="overflow:auto"><table class="table" id="tblInvSum"></table></div>
+      </article>
+      <article class="card span-4">
+        <div class="title">Labor Summary</div>
+        <div style="overflow:auto"><table class="table" id="tblLabor"></table></div>
+      </article>
+      <article class="card span-4">
+        <div class="title">Top Selling Room Types (MTD)</div>
+        <div style="overflow:auto"><table class="table" id="tblTopRooms"></table></div>
+      </article>
+    </section>
+
+    <!-- Clients list -->
+    <section class="card" id="clients" style="margin-top:16px">
+      <div class="title">Clients</div>
+      <div style="overflow:auto">
+        <table class="table" id="clientsTable"></table>
+      </div>
+    </section>
+
+    <!-- Maintenance: Create Ticket -->
+    <section class="card" id="maintenance" style="margin-top:16px">
+      <div class="title">Create Maintenance Ticket</div>
+      <div class="row gap-sm" style="margin-top:8px">
+        <div>
+          <label>Room #</label>
+          <input id="mtRoom" placeholder="e.g. 307" />
+          <div class="help">Enter the room number to service.</div>
+        </div>
+        <div>
+          <label>Priority</label>
+          <select id="mtPriority"><option>Low</option><option selected>Medium</option><option>High</option></select>
+          <div class="help">How urgent is the issue?</div>
+        </div>
+      </div>
+      <div class="row gap-sm" style="margin-top:8px">
+        <div>
+          <label>Issue</label>
+          <input id="mtIssue" placeholder="e.g. Shower leaking" />
+          <div class="help">Short description for the technician.</div>
+        </div>
+        <div>
+          <label>Assign To</label>
+          <select id="mtAssign"></select>
+          <div class="help">Select a maintenance staff.</div>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <label>Notes</label>
+        <textarea id="mtNotes" rows="3" placeholder="Optional details (access notes, history, etc.)"></textarea>
+      </div>
+      <div style="margin-top:10px">
+        <button id="btnCreateTask" class="primary">Create Ticket</button>
+        <span id="mtMsg" class="msg"></span>
+      </div>
+    </section>
+
+    <!-- Finance: Record AR, Cash Deposit, Expense -->
+    <section class="grid" id="financeLite" style="margin-top:16px">
+      <article class="card span-4">
+        <div class="title">Record A/R</div>
+        <div class="row gap-sm" style="margin-top:8px">
+          <div><label>Client / Company</label><input id="arWho" placeholder="e.g. ACME Corp" /></div>
+          <div><label>Amount (₱)</label><input id="arAmt" type="number" min="0" step="1" /></div>
+        </div>
+        <div style="margin-top:8px"><label>Notes</label><input id="arNote" placeholder="Reference / terms" /></div>
+        <div style="margin-top:10px"><button id="btnAR" class="primary">Save A/R</button> <span id="arMsg" class="msg"></span></div>
+      </article>
+      <article class="card span-4">
+        <div class="title">Record Cash Deposit</div>
+        <div class="row gap-sm" style="margin-top:8px">
+          <div><label>Bank</label><input id="cdBank" placeholder="e.g. BPI" /></div>
+          <div><label>Amount (₱)</label><input id="cdAmt" type="number" min="0" step="1" /></div>
+          <div><label>Ref #</label><input id="cdRef" placeholder="Slip/Txn #" /></div>
+        </div>
+        <div style="margin-top:10px"><button id="btnCD" class="primary">Save Deposit</button> <span id="cdMsg" class="msg"></span></div>
+      </article>
+      <article class="card span-4">
+        <div class="title">Record Expense</div>
+        <div class="row gap-sm" style="margin-top:8px">
+          <div><label>Category</label><select id="exCat"><option>Supplies</option><option>Maintenance</option><option>Utilities</option><option>Payroll</option><option>Other</option></select></div>
+          <div><label>Amount (₱)</label><input id="exAmt" type="number" min="0" step="1" /></div>
+          <div><label>Vendor</label><input id="exVendor" placeholder="e.g. Hardware Store" /></div>
+        </div>
+        <div style="margin-top:8px"><label>Notes</label><input id="exNote" placeholder="What for?" /></div>
+        <div style="margin-top:10px"><button id="btnEX" class="primary">Save Expense</button> <span id="exMsg" class="msg"></span></div>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <div class="title">Recent Finance Transactions (Today)</div>
+      <div style="overflow:auto"><table class="table" id="finTable"></table></div>
+    </section>
+
+    <div style="height:40px"></div>
+  </div>
+  </main>
+</div>
+
+<script>
+  const sidebar=document.getElementById('sidebar');
+  const menuBtn=document.getElementById('menuBtn');
+  const backdrop=document.getElementById('backdrop');
+  menuBtn&&menuBtn.addEventListener('click',()=>{sidebar.classList.add('open');backdrop.classList.add('show')});
+  backdrop&&backdrop.addEventListener('click',()=>{sidebar.classList.remove('open');backdrop.classList.remove('show')});
+  const navLinks=document.querySelectorAll('.nav a[href^="#"]');
+  const sections=document.querySelectorAll('section[id], main[id]');
+  function setActive(){let c='top';sections.forEach(s=>{if(pageYOffset>=s.offsetTop-100)c=s.id});navLinks.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+c))}
+  addEventListener('scroll',setActive);
+  navLinks.forEach(a=>a.addEventListener('click',()=>{sidebar.classList.remove('open');backdrop.classList.remove('show')}));
+
+  const LS={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};
+  const CLIENTS_KEY='bmh_clients';
+  const PAY_KEY='bmh_payments';
+  const RA_KEY='bmh_ra_rooms';
+  const TICKET_KEY='bmh_tickets';
+  const STAFF_KEY='bmh_staff';
+  const EMP_KEY='bmh_employees';
+  const INV_KEY='bmh_inventory';
+  const AR_KEY='bmh_ar';
+  const CD_KEY='bmh_cash_deposits';
+  const EX_KEY='bmh_expenses';
+
+  let clients=LS.get(CLIENTS_KEY,[]);
+  if(!clients.length){
+    clients=[
+      {ref:'BMH-1021', name:'Santos, Maria', room:'204', nights:2, amount:5200, source:'Online', checkin:'Today', status:'In-house'},
+      {ref:'BMH-1022', name:'Reyes, Juan',  room:'307', nights:1, amount:4200, source:'OTA',    checkin:'Today', status:'Arriving'},
+      {ref:'BMH-1023', name:'Lee, Ana',     room:'205', nights:3, amount:7800, source:'Online', checkin:'Tomorrow', status:'Booked'},
+      {ref:'WALK-IN-01', name:'Walk-in Guest', room:'115', nights:1, amount:2600, source:'Walk-in', checkin:'Today', status:'In-house'}
+    ];
+    LS.set(CLIENTS_KEY,clients);
+  }
+  let pays=LS.get(PAY_KEY,[{time:'10:05', amount:2600},{time:'11:20', amount:4800}]); LS.set(PAY_KEY,pays);
+
+  function renderAnalytics(){
+    const guestsToday=clients.filter(c=>c.checkin==='Today').length;
+    const rooms=LS.get(RA_KEY,[]);
+    const dirty=rooms.filter(r=>r.status==='Dirty').length;
+    const tickets=LS.get(TICKET_KEY,[]);
+    const openT=tickets.filter(t=>t.status==='Open' || t.status==='In Progress').length;
+    const paid=pays.reduce((a,p)=>a+(+p.amount||0),0);
+    document.getElementById('aGuests').textContent=guestsToday;
+    document.getElementById('aDirty').textContent=dirty;
+    document.getElementById('aTickets').textContent=openT;
+    document.getElementById('aPayments').textContent='₱ '+paid.toLocaleString();
+  }
+
+  function renderClients(){
+    const tbl=document.getElementById('clientsTable');
+    tbl.innerHTML=`<tr><th>Ref</th><th>Name</th><th>Room</th><th>Nights</th><th>Amount</th><th>Source</th><th>Check-in</th><th>Status</th></tr>`+
+      clients.map(c=>`<tr><td>${c.ref}</td><td>${c.name}</td><td>${c.room}</td><td>${c.nights}</td><td>₱ ${(c.amount||0).toLocaleString()}</td><td>${c.source}</td><td>${c.checkin}</td><td>${c.status}</td></tr>`).join('');
+  }
+
+  (function initStaff(){
+    const staff=LS.get(STAFF_KEY,[{id:'mt1',name:'Alex'},{id:'mt2',name:'Bobby'},{id:'mt3',name:'Carlos'}]);
+    LS.set(STAFF_KEY,staff);
+    const sel=document.getElementById('mtAssign');
+    if(sel) sel.innerHTML=staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  })();
+
+  const btnCreateTask=document.getElementById('btnCreateTask');
+  const mtMsg=document.getElementById('mtMsg');
+  btnCreateTask&&btnCreateTask.addEventListener('click',()=>{
+    const room=(document.getElementById('mtRoom').value||'').trim();
+    const issue=(document.getElementById('mtIssue').value||'').trim();
+    const priority=document.getElementById('mtPriority').value;
+    const assignee=document.getElementById('mtAssign').value;
+    const notes=(document.getElementById('mtNotes').value||'').trim();
+    if(!room||!issue){
+      if(mtMsg){ mtMsg.textContent='Room and Issue are required.'; mtMsg.className='msg bad'; }
+      return;
+    }
+    const id='T'+Math.floor(Math.random()*1e6);
+    const t=LS.get(TICKET_KEY,[]);
+    t.unshift({id,room,issue,priority,due:'',assignee,notes,parts:'',photo:'',status:'Open',created:new Date().toISOString(),logs:[{type:'status',status:'Open',at:new Date().toISOString()}]});
+    LS.set(TICKET_KEY,t);
+    renderAnalytics();
+    document.getElementById('mtRoom').value='';document.getElementById('mtIssue').value='';document.getElementById('mtNotes').value='';
+    if(mtMsg){ mtMsg.textContent=`Ticket ${id} created.`; mtMsg.className='msg good'; setTimeout(()=>{ mtMsg.textContent=''; mtMsg.className='msg'; }, 2500); }
+  });
+
+  renderAnalytics();
+  renderClients();
+
+  // ===== Summaries =====
+  function renderInvSummary(){
+    const inv=LS.get(INV_KEY,[]);
+    const byCat={};
+    (inv||[]).forEach(i=>{ byCat[i.cat]= (byCat[i.cat]||0) + (+i.qty||0); });
+    const rows=Object.entries(byCat).map(([cat,qty])=>`<tr><td>${cat}</td><td>${qty}</td></tr>`).join('');
+    const tbl=document.getElementById('tblInvSum');
+    tbl.innerHTML=`<tr><th>Category</th><th>Total Qty</th></tr>`+rows;
+  }
+  function renderLabor(){
+    const emps=LS.get(EMP_KEY,[]);
+    const byRole={};
+    (emps||[]).forEach(e=>{ byRole[e.role]= (byRole[e.role]||0)+1; });
+    const rows=Object.entries(byRole).map(([role,c])=>`<tr><td>${role}</td><td>${c}</td></tr>`).join('');
+    document.getElementById('tblLabor').innerHTML=`<tr><th>Role</th><th>Count</th></tr>`+rows;
+  }
+  function renderTopRooms(){
+    // derive from clients: count by type using room number mapping like receptionist
+    const clients=LS.get('bmh_clients',[]);
+    function typeOf(room){
+      const s=String(room||'');
+      if(s.startsWith('1')) return 'King Size';
+      if(s.startsWith('2')) return 'Two Beds';
+      return 'Family Suite';
+    }
+    const counts={};
+    (clients||[]).forEach(c=>{ const t=typeOf(c.room); counts[t]=(counts[t]||0)+1; });
+    const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const tbl=document.getElementById('tblTopRooms');
+    tbl.innerHTML=`<tr><th>Room Type</th><th>Bookings (MTD)</th></tr>`+
+      sorted.map(([t,n])=>`<tr><td>${t}</td><td>${n}</td></tr>`).join('');
+  }
+  renderInvSummary();
+  renderLabor();
+  renderTopRooms();
+
+  // ===== Finance Handlers =====
+  const arMsg=document.getElementById('arMsg');
+  const cdMsg=document.getElementById('cdMsg');
+  const exMsg=document.getElementById('exMsg');
+  function nowHM(){return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+  function renderFin(){
+    const ar=LS.get(AR_KEY,[]).filter(x=>new Date(x.at).toDateString()===new Date().toDateString());
+    const cd=LS.get(CD_KEY,[]).filter(x=>new Date(x.at).toDateString()===new Date().toDateString());
+    const ex=LS.get(EX_KEY,[]).filter(x=>new Date(x.at).toDateString()===new Date().toDateString());
+    const rows=[
+      ...ar.map(x=>({time:x.time,type:'A/R',detail:x.who,amount:x.amount})),
+      ...cd.map(x=>({time:x.time,type:'Deposit',detail:`${x.bank} — ${x.ref||''}`,amount:x.amount})),
+      ...ex.map(x=>({time:x.time,type:`Expense (${x.cat})`,detail:x.vendor,amount:-Math.abs(x.amount)}))
+    ].sort((a,b)=>a.time.localeCompare(b.time));
+    const tbl=document.getElementById('finTable');
+    tbl.innerHTML=`<tr><th>Time</th><th>Type</th><th>Detail</th><th>Amount</th></tr>`+
+      rows.map(r=>`<tr><td>${r.time}</td><td>${r.type}</td><td>${r.detail||''}</td><td>${(r.amount<0?'- ':'')+'₱ '+Math.abs(r.amount).toLocaleString()}</td></tr>`).join('');
+  }
+
+  document.getElementById('btnAR').addEventListener('click',()=>{
+    const who=(document.getElementById('arWho').value||'').trim();
+    const amount=+document.getElementById('arAmt').value||0;
+    const note=(document.getElementById('arNote').value||'').trim();
+    if(!who||amount<=0){ arMsg.textContent='Enter client and positive amount.'; arMsg.className='msg bad'; return }
+    const arr=LS.get(AR_KEY,[]); const time=nowHM(); const at=new Date().toISOString();
+    arr.unshift({who,amount,note,time,at}); LS.set(AR_KEY,arr);
+    arMsg.textContent='A/R recorded.'; arMsg.className='msg good'; setTimeout(()=>{arMsg.textContent=''; arMsg.className='msg'},2000);
+    document.getElementById('arWho').value=''; document.getElementById('arAmt').value=''; document.getElementById('arNote').value='';
+    renderFin();
+  });
+
+  document.getElementById('btnCD').addEventListener('click',()=>{
+    const bank=(document.getElementById('cdBank').value||'').trim();
+    const amount=+document.getElementById('cdAmt').value||0;
+    const ref=(document.getElementById('cdRef').value||'').trim();
+    if(!bank||amount<=0){ cdMsg.textContent='Enter bank and positive amount.'; cdMsg.className='msg bad'; return }
+    const arr=LS.get(CD_KEY,[]); const time=nowHM(); const at=new Date().toISOString();
+    arr.unshift({bank,amount,ref,time,at}); LS.set(CD_KEY,arr);
+    cdMsg.textContent='Deposit recorded.'; cdMsg.className='msg good'; setTimeout(()=>{cdMsg.textContent=''; cdMsg.className='msg'},2000);
+    document.getElementById('cdBank').value=''; document.getElementById('cdAmt').value=''; document.getElementById('cdRef').value='';
+    renderFin();
+  });
+
+  document.getElementById('btnEX').addEventListener('click',()=>{
+    const cat=document.getElementById('exCat').value;
+    const amount=+document.getElementById('exAmt').value||0;
+    const vendor=(document.getElementById('exVendor').value||'').trim();
+    const note=(document.getElementById('exNote').value||'').trim();
+    if(amount<=0||!vendor){ exMsg.textContent='Enter vendor and positive amount.'; exMsg.className='msg bad'; return }
+    const arr=LS.get(EX_KEY,[]); const time=nowHM(); const at=new Date().toISOString();
+    arr.unshift({cat,amount,vendor,note,time,at}); LS.set(EX_KEY,arr);
+    exMsg.textContent='Expense recorded.'; exMsg.className='msg good'; setTimeout(()=>{exMsg.textContent=''; exMsg.className='msg'},2000);
+    document.getElementById('exAmt').value=''; document.getElementById('exVendor').value=''; document.getElementById('exNote').value='';
+    renderFin();
+  });
+
+  renderFin();
+</script>
+</body>
+</html>

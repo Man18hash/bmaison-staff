@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B Maison — Room Attendant</title>
+  <style>
+    :root{ --bg:#f3f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --brand:#111827; --border:#e5e7eb }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    html{scroll-behavior:smooth}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg)}
+
+    .layout{display:flex; min-height:100vh; position:relative}
+    aside{background:var(--brand); color:#e5e7eb; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; z-index:50; box-shadow:2px 0 8px rgba(0,0,0,.1)}
+    aside.open{transform:translateX(0)}
+    main{flex:1; width:100%; margin-left:0; transition:margin-left .25s ease; min-height:100vh; padding:18px 20px}
+    .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:40}
+    .backdrop.show{display:block}
+    @media (min-width:960px){ aside{transform:translateX(0)} main{margin-left:260px} .backdrop{display:none!important} }
+
+    .logo{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06)}
+    .logo span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:12px}
+    .nav{padding:8px; flex:1; overflow-y:auto}
+    .nav a{display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:12px; color:#d1d5db; text-decoration:none}
+    .nav a:hover{background:#1f2937; color:#fff}
+    .nav a.active{background:#0b1220; color:#fff}
+    .push-bottom{margin-top:auto; padding:8px; border-top:1px solid rgba(255,255,255,.06)}
+    .logout{display:flex; gap:10px; align-items:center; padding:10px 12px; color:#fecaca; text-decoration:none; border-radius:12px}
+    .logout:hover{background:#331f1f}
+
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0}
+    header .menu{display:inline-flex; background:#fff; border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer}
+    @media (min-width:960px){ header .menu{display:none} }
+
+    .grid{display:grid; gap:16px; grid-template-columns:repeat(12, 1fr)}
+    .span-4{grid-column:span 12} .span-8{grid-column:span 12}
+    @media (min-width:960px){ .span-4{grid-column:span 4} .span-8{grid-column:span 8} }
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px}
+    .title{font-size:13px; color:var(--muted); margin:0 0 6px}
+    .table{width:100%; border-collapse:collapse; font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border); padding:10px; text-align:left}
+    .table th{font-size:12px; color:var(--muted)}
+    input,select,textarea,button{font:inherit}
+    input,select,textarea{width:100%; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff}
+    button{padding:10px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer}
+    button.primary{background:#111827; color:#fff; border-color:#111827}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .row>*{flex:1}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid}
+    .b-dirty{background:#fff1f2; color:#9f1239; border-color:#fecdd3}
+    .b-ip{background:#f1f5f9; color:#0f172a; border-color:#e2e8f0}
+    .b-clean{background:#ecfdf5; color:#065f46; border-color:#a7f3d0}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar">
+    <div class="logo"><span>B MAISON HOTEL</span></div>
+    <nav class="nav">
+      <a class="active" href="#top">🧹 Room Attendant</a>
+      <a href="#assigned">🗂️ Assigned Rooms</a>
+      <a href="#work">📝 Cleaning & Supplies</a>
+      <a href="#logs">📒 Today's Logs</a>
+    </nav>
+    <div class="push-bottom"><a class="logout" href="index.html">↩ Logout</a></div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="top">
+    <header>
+      <h1>Room Attendant — My Work</h1>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <section class="grid" id="assigned">
+      <article class="card span-4">
+        <div class="title">Assigned Rooms</div>
+        <div style="overflow:auto; max-height:60vh">
+          <table class="table" id="roomList"></table>
+        </div>
+      </article>
+      <article class="card span-8" id="work">
+        <div class="title">Cleaning & Supplies</div>
+        <div id="workNone" style="color:var(--muted)">Select a room to begin.</div>
+        <div id="workPane" style="display:none">
+          <div class="row">
+            <div><label>Room</label><input id="rRoom" disabled></div>
+            <div><label>Status</label><input id="rStatus" disabled></div>
+            <div><label>Guest</label><input id="rGuest" disabled></div>
+          </div>
+          <div style="margin-top:8px">
+            <button id="btnStart">Start Cleaning</button>
+            <button id="btnDone" class="primary">Mark Cleaned</button>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <div><label>Towels</label><input id="sTowel" type="number" min="0" step="1" value="0"></div>
+            <div><label>Bedsheets</label><input id="sSheet" type="number" min="0" step="1" value="0"></div>
+            <div><label>Toothbrush</label><input id="sBrush" type="number" min="0" step="1" value="0"></div>
+            <div><label>Toothpaste</label><input id="sPaste" type="number" min="0" step="1" value="0"></div>
+            <div><label>Shampoo</label><input id="sShampoo" type="number" min="0" step="1" value="0"></div>
+          </div>
+          <div style="margin-top:8px"><button id="btnSupplies">Record Supplies</button></div>
+          <div style="margin-top:12px">
+            <label>Issue / Comment</label>
+            <textarea id="issueText" rows="3" placeholder="e.g. TV not working, faucet leak, etc."></textarea>
+            <div class="row" style="margin-top:8px">
+              <div><label>Create Maintenance Ticket?</label>
+                <select id="issuePriority"><option>Low</option><option selected>Medium</option><option>High</option></select>
+              </div>
+              <div style="align-self:end"><button id="btnIssue" class="primary">Log Issue</button></div>
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="title">Recent Room Logs</div>
+            <div id="roomLogs" style="font-size:14px"></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="card" id="logs" style="margin-top:16px">
+      <div class="title">Today's Logs</div>
+      <div style="overflow:auto">
+        <table class="table" id="logTable"></table>
+      </div>
+    </section>
+
+    <div style="height:40px"></div>
+  </main>
+</div>
+
+<script>
+  // Sidebar mobile
+  const sidebar = document.getElementById('sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  const backdrop = document.getElementById('backdrop');
+  menuBtn && menuBtn.addEventListener('click', ()=>{ sidebar.classList.add('open'); backdrop.classList.add('show'); });
+  backdrop && backdrop.addEventListener('click', ()=>{ sidebar.classList.remove('open'); backdrop.classList.remove('show'); });
+  const navLinks=document.querySelectorAll('.nav a[href^="#"]'); const sections=document.querySelectorAll('section[id], main[id]');
+  addEventListener('scroll', ()=>{ let c='top'; sections.forEach(s=>{ if(pageYOffset>=s.offsetTop-100) c=s.id; }); navLinks.forEach(a=>a.classList.toggle('active', a.getAttribute('href')==='#'+c)); });
+
+  // Storage
+  const LS={ get(k,f){ try{return JSON.parse(localStorage.getItem(k))??f;}catch(e){return f;} }, set(k,v){ localStorage.setItem(k, JSON.stringify(v)); } };
+  const RA_KEY='bmh_ra_rooms';
+  const LOG_KEY='bmh_ra_logs';
+  const TICKET_KEY='bmh_tickets';
+
+  let rooms = LS.get(RA_KEY, []);
+  if(!rooms || rooms.length===0){
+    rooms = [
+      {room:'204', guest:'Santos, Maria',    status:'Dirty',      logs:[], supplies:[]},
+      {room:'205', guest:'—',                status:'Dirty',      logs:[], supplies:[]},
+      {room:'307', guest:'Reyes, Juan',      status:'In Progress',logs:[{at:new Date().toISOString(), note:'Stripped bed'}], supplies:[]},
+      {room:'221', guest:'—',                status:'Dirty',      logs:[], supplies:[]}
+    ];
+    LS.set(RA_KEY, rooms);
+  }
+  let dayLogs = LS.get(LOG_KEY, []);
+
+  // Render list
+  const roomList=document.getElementById('roomList');
+  const workNone=document.getElementById('workNone');
+  const workPane=document.getElementById('workPane');
+  let current=null;
+  function badge(s){ return s==='Dirty'?'<span class="badge b-dirty">Dirty</span>': s==='In Progress'?'<span class="badge b-ip">In Progress</span>':'<span class="badge b-clean">Cleaned</span>'; }
+  function renderRooms(){
+    rooms = LS.get(RA_KEY, rooms);
+    roomList.innerHTML = `<tr><th>Room</th><th>Guest</th><th>Status</th></tr>` +
+      rooms.map(r=>`<tr data-room="${r.room}" class="rowItem"><td>${r.room}</td><td>${r.guest}</td><td>${badge(r.status)}</td></tr>`).join('');
+    roomList.querySelectorAll('.rowItem').forEach(tr=> tr.addEventListener('click', ()=>selectRoom(tr.dataset.room)) );
+  }
+  function selectRoom(num){
+    current = rooms.find(r=>r.room===num);
+    if(!current){ workNone.style.display='block'; workPane.style.display='none'; return; }
+    workNone.style.display='none'; workPane.style.display='block';
+    document.getElementById('rRoom').value=current.room;
+    document.getElementById('rStatus').value=current.status;
+    document.getElementById('rGuest').value=current.guest;
+    renderRoomLogs();
+  }
+  function renderRoomLogs(){
+    const el=document.getElementById('roomLogs');
+    if(!current || !current.logs || !current.logs.length){ el.innerHTML='<em>No logs</em>'; return; }
+    el.innerHTML = current.logs.map(l=> new Date(l.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})+ ' — ' + (l.note||'') ).join('<br>');
+  }
+
+  // Actions
+  document.getElementById('btnStart').addEventListener('click', ()=>{
+    if(!current) return; current.status='In Progress'; (current.logs=current.logs||[]).push({at:new Date().toISOString(), note:'Started cleaning'}); LS.set(RA_KEY, rooms); selectRoom(current.room); renderRooms();
+  });
+  document.getElementById('btnDone').addEventListener('click', ()=>{
+    if(!current) return; current.status='Cleaned'; (current.logs=current.logs||[]).push({at:new Date().toISOString(), note:'Marked as cleaned'}); LS.set(RA_KEY, rooms); selectRoom(current.room); renderRooms(); addDailyLog(current.room,'Marked cleaned');
+  });
+  function addDailyLog(room, action, extra){
+    dayLogs.unshift({time:new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), room, action, extra:extra||''});
+    LS.set(LOG_KEY, dayLogs); renderDayLogs();
+  }
+  function renderDayLogs(){
+    const tbl=document.getElementById('logTable');
+    tbl.innerHTML = `<tr><th>Time</th><th>Room</th><th>Action</th><th>Details</th></tr>` +
+      dayLogs.map(l=>`<tr><td>${l.time}</td><td>${l.room}</td><td>${l.action}</td><td>${l.extra}</td></tr>`).join('');
+  }
+
+  document.getElementById('btnSupplies').addEventListener('click', ()=>{
+    if(!current) return;
+    const tow=+document.getElementById('sTowel').value||0;
+    const sht=+document.getElementById('sSheet').value||0;
+    const br=+document.getElementById('sBrush').value||0;
+    const pa=+document.getElementById('sPaste').value||0;
+    const sh=+document.getElementById('sShampoo').value||0;
+    const items=[['Towel',tow],['Bedsheet',sht],['Toothbrush',br],['Toothpaste',pa],['Shampoo',sh]].filter(x=>x[1]>0).map(x=>x[0]+ '×'+x[1]).join(', ');
+    (current.supplies=current.supplies||[]).push({at:new Date().toISOString(), tow,sht,br,pa,sh});
+    (current.logs=current.logs||[]).push({at:new Date().toISOString(), note:'Supplies used: '+ (items||'none')});
+    LS.set(RA_KEY, rooms); selectRoom(current.room); addDailyLog(current.room,'Supplies used', items);
+    // reset inputs
+    ['sTowel','sSheet','sBrush','sPaste','sShampoo'].forEach(id=>document.getElementById(id).value=0);
+  });
+
+  document.getElementById('btnIssue').addEventListener('click', ()=>{
+    if(!current) return; const text=document.getElementById('issueText').value.trim(); if(!text){ alert('Enter issue/comment'); return; }
+    const priority=document.getElementById('issuePriority').value;
+    (current.logs=current.logs||[]).push({at:new Date().toISOString(), note:'Issue: '+text});
+    LS.set(RA_KEY, rooms);
+    // create a ticket for maintenance
+    const tickets = LS.get(TICKET_KEY, []);
+    const id = 'T' + Math.floor(Math.random()*1e6);
+    tickets.unshift({ id, room:current.room, issue:text, priority, due:'', assignee:'', notes:'From Room Attendant', parts:'', photo:'', status:'Open', created:new Date().toISOString(), logs:[{type:'status', status:'Open', at:new Date().toISOString()}] });
+    LS.set(TICKET_KEY, tickets);
+    addDailyLog(current.room, 'Logged issue', text + ' (ticket '+id+')');
+    document.getElementById('issueText').value='';
+  });
+
+  renderRooms();
+  renderDayLogs();
+</script>
+</body>
+</html>

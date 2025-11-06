@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B maison hotel — Sign in</title>
+  <style>
+    :root{
+      --brand:#f5c518; /* accent for button */
+      --glass-bg: rgba(255,255,255,.9);
+      --text:#0f172a;
+      --muted:#64748b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--text)}
+
+    /* Background */
+    .bg{
+      position:fixed;inset:0;overflow:hidden;
+      background: #0b0e14 url('assets/images/gallery/gallery-04.jpeg') center/cover no-repeat fixed; /* replace bg.jpg with your photo */
+    }
+    .bg::after{ /* dark overlay for readability */
+      content:""; position:absolute; inset:0; background:rgba(0,0,0,.55);
+    }
+
+    /* Center card */
+    .wrap{position:relative; z-index:1; min-height:100%; display:grid; place-items:center; padding:24px}
+    .card{
+      width:100%; max-width:420px; border-radius:18px; background:var(--glass-bg);
+      box-shadow:0 10px 30px rgba(0,0,0,.25); backdrop-filter:saturate(180%) blur(8px);
+      padding:26px 26px 18px;
+      animation:fadeIn .35s ease both
+    }
+    @keyframes fadeIn{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:translateY(0)}}
+
+    h1{font-size:18px; letter-spacing:.12em; text-transform:uppercase; text-align:center; margin:6px 0 18px}
+    .brand{display:block; text-align:center; font-weight:700; font-size:13px; letter-spacing:.18em; color:#334155}
+
+    label{display:block; font-size:12px; font-weight:600; color:#334155; margin:10px 6px 6px}
+    select,input{width:100%; padding:12px 14px; border-radius:12px; border:1px solid #cbd5e1; outline:none; font-size:14px; background:white}
+    select:focus,input:focus{border-color:#94a3b8; box-shadow:0 0 0 4px rgba(148,163,184,.25)}
+
+    .disabled{background:#f1f5f9; color:#94a3b8; cursor:not-allowed}
+
+    .btn{
+      width:100%; margin-top:12px; padding:12px 14px; border:0; border-radius:12px; background:var(--brand);
+      font-weight:700; cursor:pointer; transition:transform .05s ease, filter .2s ease
+    }
+    .btn:active{transform:translateY(1px)}
+
+    .hint{margin:8px 4px 0; font-size:11px; color:var(--muted); text-align:center}
+    footer{margin-top:14px; text-align:center; font-size:11px; color:#475569}
+
+    /* tiny shake on error */
+    .shake{animation:shake .35s}
+    @keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
+
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <main class="wrap">
+    <section class="card" id="card">
+      <h1>B MAISON HOTEL</h1>
+
+      <label for="role">Email (choose role)</label>
+      <select id="role" aria-label="Choose role (acts as email)" required>
+        <option value="" selected disabled>Select a role…</option>
+        <option data-route="manager.html">General Manager</option>
+        <option data-route="admin.html">Admin</option>
+        <option data-route="head.html">Head Maintenance</option>
+        <option data-route="room.html">Room Attendant</option>
+        <option data-route="receptionist.html">Receptionist</option>
+        <option data-route="maintenance.html">Maintenance</option>
+      </select>
+
+      <label for="pwd">Password</label>
+      <input id="pwd" class="disabled" type="password" placeholder="Disabled for prototype" disabled title="Password is disabled for this prototype" />
+
+      <button class="btn" id="loginBtn">Log In</button>
+      <p class="hint">Choosing a role will redirect to its page. Password field is intentionally disabled.</p>
+
+      <footer>© 2025 B Maison Hotel</footer>
+    </section>
+  </main>
+
+  <script>
+    (function(){
+      const sel = document.getElementById('role');
+      const btn = document.getElementById('loginBtn');
+      const card = document.getElementById('card');
+
+      function go(){
+        const opt = sel.options[sel.selectedIndex];
+        const route = opt && opt.dataset.route;
+        if(!route){
+          card.classList.remove('shake');
+          // trigger reflow to replay animation
+          void card.offsetWidth;
+          card.classList.add('shake');
+          return;
+        }
+        window.location.href = route;
+      }
+
+      btn.addEventListener('click', go);
+      sel.addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+    })();
+  </script>
+</body>
+</html>

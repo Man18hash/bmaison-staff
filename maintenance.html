@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B Maison — Maintenance</title>
+  <style>
+    :root{ --bg:#f3f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --brand:#111827; --border:#e5e7eb }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    html{scroll-behavior:smooth}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg)}
+
+    .layout{display:flex; min-height:100vh; position:relative}
+    aside{background:var(--brand); color:#e5e7eb; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; z-index:50; box-shadow:2px 0 8px rgba(0,0,0,.1)}
+    aside.open{transform:translateX(0)}
+    main{flex:1; width:100%; margin-left:0; transition:margin-left .25s ease; min-height:100vh; padding:18px 20px}
+    .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:40}
+    .backdrop.show{display:block}
+    @media (min-width:960px){ aside{transform:translateX(0)} main{margin-left:260px} .backdrop{display:none!important} }
+
+    .logo{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06)}
+    .logo span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:12px}
+    .nav{padding:8px; flex:1; overflow-y:auto}
+    .nav a{display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:12px; color:#d1d5db; text-decoration:none}
+    .nav a:hover{background:#1f2937; color:#fff}
+    .nav a.active{background:#0b1220; color:#fff}
+    .push-bottom{margin-top:auto; padding:8px; border-top:1px solid rgba(255,255,255,.06)}
+    .logout{display:flex; gap:10px; align-items:center; padding:10px 12px; color:#fecaca; text-decoration:none; border-radius:12px}
+    .logout:hover{background:#331f1f}
+
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0}
+    header .menu{display:inline-flex; background:#fff; border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer}
+    @media (min-width:960px){ header .menu{display:none} }
+
+    .grid{display:grid; gap:16px; grid-template-columns:repeat(12, 1fr)}
+    .span-4{grid-column:span 12} .span-8{grid-column:span 12}
+    @media (min-width:960px){ .span-4{grid-column:span 4} .span-8{grid-column:span 8} }
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px}
+    .title{font-size:13px; color:var(--muted); margin:0 0 6px}
+
+    .table{width:100%; border-collapse:collapse; font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border); padding:10px; text-align:left}
+    .table th{font-size:12px; color:var(--muted)}
+    input,select,textarea,button{font:inherit}
+    input,select,textarea{width:100%; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff}
+    button{padding:10px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer}
+    button.primary{background:#111827; color:#fff; border-color:#111827}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .row>*{flex:1}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid}
+    .b-open{background:#fff1f2; color:#9f1239; border-color:#fecdd3}
+    .b-ip{background:#f1f5f9; color:#0f172a; border-color:#e2e8f0}
+    .b-done{background:#ecfdf5; color:#065f46; border-color:#a7f3d0}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar">
+    <div class="logo"><span>B MAISON HOTEL</span></div>
+    <nav class="nav">
+      <a class="active" href="#top">🔧 Maintenance</a>
+      <a href="#inbox">📥 Assigned Tickets</a>
+      <a href="#work">🧰 Work Details</a>
+    </nav>
+    <div class="push-bottom"><a class="logout" href="index.html">↩ Logout</a></div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="top">
+    <header>
+      <h1>Maintenance — My Tickets</h1>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <section class="card" style="margin-bottom:16px">
+      <div class="row">
+        <div>
+          <label>Technician</label>
+          <select id="me"></select>
+        </div>
+        <div>
+          <label>Status Filter</label>
+          <select id="fStatus"><option value="">All</option><option>Open</option><option>In Progress</option><option>Completed</option><option>Closed</option></select>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid" id="inbox">
+      <article class="card span-4">
+        <div class="title">Assigned Tickets</div>
+        <div style="overflow:auto; max-height:60vh">
+          <table class="table" id="ticketList"></table>
+        </div>
+      </article>
+      <article class="card span-8" id="work">
+        <div class="title">Work Details</div>
+        <div id="workNone" style="color:var(--muted)">Select a ticket to begin.</div>
+        <div id="workPane" style="display:none">
+          <div class="row">
+            <div><label>Ticket ID</label><input id="wId" disabled></div>
+            <div><label>Room</label><input id="wRoom" disabled></div>
+            <div><label>Issue</label><input id="wIssue" disabled></div>
+            <div><label>Status</label><input id="wStatus" disabled></div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <div>
+              <label>Add Time Log (mins)</label>
+              <input id="wMins" type="number" min="1" step="1" placeholder="e.g. 30" />
+            </div>
+            <div>
+              <label>Work Note</label>
+              <input id="wNote" placeholder="What did you do?" />
+            </div>
+            <div style="align-self:end"><button id="btnLog" class="primary">Add Log</button></div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <div><label>Part Used</label><input id="wPart" placeholder="e.g. AC Filter" /></div>
+            <div><label>Qty</label><input id="wQty" type="number" min="1" step="1" /></div>
+            <div><label>Cost (₱)</label><input id="wCost" type="number" min="0" step="1" /></div>
+            <div style="align-self:end"><button id="btnPart">Add Part</button></div>
+          </div>
+          <div style="margin-top:8px">
+            <button id="btnStart">Start</button>
+            <button id="btnComplete" class="primary">Mark Completed</button>
+          </div>
+          <div style="margin-top:12px">
+            <div class="title">Logs</div>
+            <div id="logs" style="font-size:14px"></div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="title">Parts Used</div>
+            <div id="parts" style="font-size:14px"></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <div style="height:40px"></div>
+  </main>
+</div>
+
+<script>
+  // Sidebar mobile
+  const sidebar = document.getElementById('sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  const backdrop = document.getElementById('backdrop');
+  menuBtn && menuBtn.addEventListener('click', ()=>{ sidebar.classList.add('open'); backdrop.classList.add('show'); });
+  backdrop && backdrop.addEventListener('click', ()=>{ sidebar.classList.remove('open'); backdrop.classList.remove('show'); });
+
+  // Storage helpers shared with Head
+  const LS={ get(k,f){ try{return JSON.parse(localStorage.getItem(k))??f;}catch(e){return f;} }, set(k,v){ localStorage.setItem(k, JSON.stringify(v)); } };
+  const STAFF_KEY='bmh_staff';
+  const TICKET_KEY='bmh_tickets';
+  let staff = LS.get(STAFF_KEY, [{id:'mt1',name:'Alex'}]);
+  let tickets = LS.get(TICKET_KEY, []);
+
+  // Technician selection
+  const meSel = document.getElementById('me');
+  meSel.innerHTML = staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+
+  const fStatus = document.getElementById('fStatus');
+  const ticketList = document.getElementById('ticketList');
+  let currentId = null;
+
+  function badge(s){ return s==='Open'?'<span class="badge b-open">Open</span>': s==='In Progress'?'<span class="badge b-ip">In Progress</span>': '<span class="badge b-done">Completed</span>'; }
+
+  function renderList(){
+    staff = LS.get(STAFF_KEY, staff);
+    tickets = LS.get(TICKET_KEY, tickets);
+    const mine = tickets.filter(t=> t.assignee===meSel.value && (!fStatus.value || t.status===fStatus.value) );
+    ticketList.innerHTML = `<tr><th>ID</th><th>Room</th><th>Issue</th><th>Due</th><th>Status</th></tr>` +
+      mine.map(t=>`<tr data-id="${t.id}" class="rowItem"><td>${t.id}</td><td>${t.room}</td><td>${t.issue}</td><td>${t.due||'—'}</td><td>${badge(t.status)}</td></tr>`).join('');
+    ticketList.querySelectorAll('.rowItem').forEach(tr=> tr.addEventListener('click', ()=> selectTicket(tr.dataset.id)) );
+    if(currentId && !mine.find(t=>t.id===currentId)){ clearWork(); }
+  }
+
+  function selectTicket(id){
+    currentId = id;
+    const t = LS.get(TICKET_KEY, []).find(x=>x.id===id);
+    if(!t){ clearWork(); return; }
+    document.getElementById('workNone').style.display='none';
+    document.getElementById('workPane').style.display='block';
+    document.getElementById('wId').value=t.id;
+    document.getElementById('wRoom').value=t.room;
+    document.getElementById('wIssue').value=t.issue;
+    document.getElementById('wStatus').value=t.status;
+    renderLogs(t); renderParts(t);
+  }
+
+  function clearWork(){ currentId=null; document.getElementById('workNone').style.display='block'; document.getElementById('workPane').style.display='none'; }
+
+  function saveTicket(t){ const all=LS.get(TICKET_KEY, []); const idx=all.findIndex(x=>x.id===t.id); if(idx>-1){ all[idx]=t; LS.set(TICKET_KEY, all); } }
+
+  function renderLogs(t){
+    const el=document.getElementById('logs');
+    if(!t.logs || !t.logs.length){ el.innerHTML='<em>No logs yet</em>'; return; }
+    el.innerHTML = t.logs.map(l=>{
+      const when = new Date(l.at||Date.now()).toLocaleString();
+      if(l.type==='time') return `${when} — +${l.mins} mins — ${l.note||''}`;
+      if(l.type==='status') return `${when} — Status: ${l.status}`;
+      return `${when} — ${l.note||''}`;
+    }).join('<br>');
+  }
+  function renderParts(t){
+    const el=document.getElementById('parts');
+    if(!t.partsUsed || !t.partsUsed.length){ el.innerHTML='<em>No parts recorded</em>'; return; }
+    el.innerHTML = t.partsUsed.map(p=>`${p.part} × ${p.qty} — ₱ ${(p.cost||0).toLocaleString()}`).join('<br>');
+  }
+
+  document.getElementById('btnStart').addEventListener('click', ()=>{
+    if(!currentId) return; const t=LS.get(TICKET_KEY, []).find(x=>x.id===currentId); if(!t) return;
+    t.status='In Progress'; t.logs=t.logs||[]; t.logs.push({type:'status', status:'In Progress', at:new Date().toISOString()});
+    saveTicket(t); renderList(); selectTicket(currentId);
+  });
+  document.getElementById('btnComplete').addEventListener('click', ()=>{
+    if(!currentId) return; const t=LS.get(TICKET_KEY, []).find(x=>x.id===currentId); if(!t) return;
+    t.status='Completed'; t.logs=t.logs||[]; t.logs.push({type:'status', status:'Completed', at:new Date().toISOString()});
+    saveTicket(t); renderList(); selectTicket(currentId);
+  });
+
+  document.getElementById('btnLog').addEventListener('click', ()=>{
+    if(!currentId) return; const t=LS.get(TICKET_KEY, []).find(x=>x.id===currentId); if(!t) return;
+    const mins = Number(document.getElementById('wMins').value||0); const note=document.getElementById('wNote').value.trim();
+    if(mins<=0){ alert('Enter minutes worked.'); return; }
+    t.logs=t.logs||[]; t.logs.push({type:'time', mins, note, at:new Date().toISOString()});
+    saveTicket(t); selectTicket(currentId);
+    document.getElementById('wMins').value=''; document.getElementById('wNote').value='';
+  });
+
+  document.getElementById('btnPart').addEventListener('click', ()=>{
+    if(!currentId) return; const t=LS.get(TICKET_KEY, []).find(x=>x.id===currentId); if(!t) return;
+    const part=document.getElementById('wPart').value.trim(); const qty=Number(document.getElementById('wQty').value||0); const cost=Number(document.getElementById('wCost').value||0);
+    if(!part || qty<=0){ alert('Enter part and qty.'); return; }
+    t.partsUsed=t.partsUsed||[]; t.partsUsed.push({part, qty, cost});
+    saveTicket(t); selectTicket(currentId);
+    document.getElementById('wPart').value=''; document.getElementById('wQty').value=''; document.getElementById('wCost').value='';
+  });
+
+  meSel.addEventListener('change', ()=>{ renderList(); clearWork(); });
+  fStatus.addEventListener('change', renderList);
+
+  renderList();
+</script>
+</body>
+</html>

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B Maison — Admin Analytics Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#f3f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --accent:#f5c518; --brand:#111827; --border:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg)}
+    html{scroll-behavior:smooth}
+
+    /* Layout */
+    .layout{display:flex; min-height:100vh; position:relative}
+    aside{background:var(--brand); color:#e5e7eb; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; z-index:50; box-shadow:2px 0 8px rgba(0,0,0,.1)}
+    aside.open{transform:translateX(0)}
+    main{flex:1; width:100%; margin-left:0; transition:margin-left .25s ease; min-height:100vh}
+    .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:40}
+    .backdrop.show{display:block}
+    @media (min-width: 960px){
+      aside{position:fixed; transform:translateX(0)}
+      main{margin-left:260px}
+      .backdrop{display:none!important}
+      header .menu{display:none}
+    }
+
+    /* Sidebar */
+    .logo{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06); flex-shrink:0}
+    .logo span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:12px}
+    .nav{padding:8px; flex:1; overflow-y:auto}
+    .nav a{display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:12px; color:#d1d5db; text-decoration:none}
+    .nav a:hover{background:#1f2937; color:#fff}
+    .nav a.active{background:#0b1220; color:#fff}
+    .push-bottom{margin-top:auto; padding:8px; flex-shrink:0; border-top:1px solid rgba(255,255,255,.06)}
+    .logout{display:flex; gap:10px; align-items:center; padding:10px 12px; color:#fecaca; text-decoration:none; border-radius:12px}
+    .logout:hover{background:#331f1f}
+
+    /* Main */
+    main{padding:18px 20px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0}
+    header .menu{display:inline-flex; background:var(--panel); border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer}
+
+    /* Cards */
+    .kpis{display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-bottom:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow:0 4px 14px rgba(0,0,0,.04)}
+    .title{font-size:13px; color:var(--muted); margin:0 0 6px}
+    .big{font-size:26px; font-weight:800}
+    .delta{font-size:12px; color:#16a34a}
+    .bad{color:#dc2626}
+
+    /* Grid sections */
+    .grid{display:grid; gap:16px; grid-template-columns:repeat(12, 1fr)}
+    .span-6{grid-column:span 12}
+    .span-4{grid-column:span 12}
+    .span-3{grid-column:span 12}
+    @media (min-width: 960px){
+      .span-6{grid-column:span 6}
+      .span-4{grid-column:span 4}
+      .span-3{grid-column:span 3}
+    }
+
+    canvas{width:100%!important; min-height:280px; max-height:360px; height:320px!important}
+    .table{width:100%; border-collapse:collapse; font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border); padding:10px; text-align:left}
+    .table th{font-size:12px; color:var(--muted)}
+    .table td{word-break:break-word}
+
+    .badge{display:inline-flex; align-items:center; gap:6px; background:#fff7d6; color:#7a5b00; padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid #fde68a}
+
+    /* Forms for new admin sections */
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .row>*{flex:1 1 260px; min-width:200px}
+    label{font-size:12px; color:var(--muted); display:block; margin:0 0 6px}
+    input,select,textarea,button{font:inherit}
+    input,select,textarea{width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:12px; background:#fff}
+    button{padding:10px 14px; border:1px solid var(--border); background:#fff; border-radius:12px; cursor:pointer}
+    button.primary{background:#111827; color:#fff; border-color:#111827}
+    .msg{font-size:13px; margin-left:8px}
+
+    /* Mobile optimizations */
+    @media (max-width: 960px){
+      .row>*{flex:1 1 100%; min-width:0}
+      .card{padding:12px}
+      .table{font-size:13px}
+      input,select,textarea{padding:10px}
+      button{width:100%}
+    }
+
+    /* Make form + table layout where table occupies remaining width on desktop */
+    @media (min-width: 960px){
+      #employees{grid-template-columns: 360px 1fr}
+      #inventory{grid-template-columns: 360px 1fr}
+      #employees .span-4, #inventory .span-4{grid-column:auto}
+      #employees .span-8, #inventory .span-8{grid-column:auto}
+    }
+    /* Ensure cards stretch to equal heights inside these grids */
+    #employees, #inventory{align-items:stretch}
+    #employees .card, #inventory .card{height:100%}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar">
+    <div class="logo"><span>B MAISON HOTEL</span></div>
+    <nav class="nav">
+      <a class="active" href="#top">🏠 Dashboard</a>
+      <a href="#channel">🛰️ Channel Performance</a>
+      <a href="#payments">💳 Payment Mix</a>
+      <a href="#ar">📬 A/R Aging</a>
+      <a href="#pnl">📊 Expenses vs Revenue</a>
+      <a href="#sales">💵 Sales</a>
+      <a href="#income">📈 Income</a>
+      <a href="#discounts">🏷️ Discounts</a>
+      <a href="#employees">👥 Employees</a>
+      <a href="#inventory">📦 Inventory</a>
+    </nav>
+    <div class="push-bottom">
+      <a class="logout" href="index.html">↩ Logout</a>
+    </div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="top">
+    <header>
+      <h1>Admin Analytics Dashboard</h1>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <!-- KPI CARDS -->
+    <section class="kpis">
+      <div class="card"><div class="title">Occupancy Rate (Today)</div><div class="big" id="kpiOcc">—</div><div class="delta" id="kpiOccNote"></div></div>
+      <div class="card"><div class="title">ADR (Avg Daily Rate)</div><div class="big" id="kpiAdr">—</div><div class="delta" id="kpiAdrNote"></div></div>
+      <div class="card"><div class="title">RevPAR</div><div class="big" id="kpiRevpar">—</div><div class="delta" id="kpiRevparNote"></div></div>
+      <div class="card"><div class="title">Bookings / Check-ins / Check-outs</div><div class="big" id="kpiFlow">—</div></div>
+    </section>
+
+    
+
+    <!-- CHARTS ROW 2 -->
+    <section class="grid" style="margin-top:16px">
+      <article class="card span-6">
+        <div class="title">ADR Trend + Room Type Distribution</div>
+        <div style="position:relative; height:320px">
+          <canvas id="adrChart"></canvas>
+        </div>
+      </article>
+      <article class="card span-6">
+        <div class="title">Revenue Mix (Rooms vs F&B vs Extras)</div>
+        <div style="position:relative; height:320px">
+          <canvas id="mixChart"></canvas>
+        </div>
+      </article>
+    </section>
+
+    <!-- FLOW BY HOUR -->
+    <section class="grid" style="margin-top:16px">
+      <article class="card span-6">
+        <div class="title">Bookings by Hour (Today)</div>
+        <div style="position:relative; height:320px">
+          <canvas id="bookingsHour"></canvas>
+        </div>
+      </article>
+      <article class="card span-6">
+        <div class="title">Check-ins & Check-outs by Hour (Today)</div>
+        <div style="position:relative; height:320px">
+          <canvas id="ioHour"></canvas>
+        </div>
+      </article>
+    </section>
+
+    <!-- CHANNEL PERFORMANCE -->
+    <section class="card" id="channel" style="margin-top:16px">
+      <div class="title" style="margin-bottom:8px">Channel Performance</div>
+      <div style="overflow:auto">
+        <table class="table" id="channelTable"></table>
+      </div>
+    </section>
+
+    <!-- PAYMENT MIX -->
+    <section class="grid" id="payments" style="margin-top:16px">
+      <article class="card span-6">
+        <div class="title">Payment Mix (Share)</div>
+        <div style="position:relative; height:320px">
+          <canvas id="payMix"></canvas>
+        </div>
+      </article>
+      <article class="card span-6">
+        <div class="title">Fees & Net by Method</div>
+        <table class="table" id="payTable"></table>
+      </article>
+    </section>
+
+    <!-- AR AGING -->
+    <section class="grid" id="ar" style="margin-top:16px">
+      <article class="card span-6">
+        <div class="title">A/R Aging Buckets</div>
+        <div style="position:relative; height:320px">
+          <canvas id="arChart"></canvas>
+        </div>
+      </article>
+      <article class="card span-6">
+        <div class="title">A/R Details</div>
+        <table class="table" id="arTable"></table>
+      </article>
+    </section>
+
+    <!-- P&L -->
+    <section class="card" id="pnl" style="margin-top:16px">
+      <div class="title">Expenses vs Revenue (MTD) — Bars with Margin Line</div>
+      <div style="position:relative; height:320px">
+        <canvas id="pnlChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Admin: Sales Report -->
+    <section class="card" id="sales" style="margin-top:16px">
+      <div class="title">Sales Report (Today)</div>
+      <div style="overflow:auto"><table class="table" id="tblSales"></table></div>
+    </section>
+
+    <!-- Admin: Income Analysis -->
+    <section class="grid" id="income" style="margin-top:16px">
+      <article class="card span-4"><div class="title">Total Payments</div><div class="big" id="incPay">₱ 0</div></article>
+      <article class="card span-4"><div class="title">A/R Created</div><div class="big" id="incAR">₱ 0</div></article>
+      <article class="card span-4"><div class="title">Cash Deposits</div><div class="big" id="incCD">₱ 0</div></article>
+    </section>
+
+    <!-- Admin: Discount Report -->
+    <section class="card" id="discounts" style="margin-top:16px">
+      <div class="title">Discount Report (Today)</div>
+      <div style="overflow:auto"><table class="table" id="tblDisc"></table></div>
+    </section>
+
+    <!-- Admin: Employees (Add + List) -->
+    <section class="grid" id="employees" style="margin-top:16px">
+      <article class="card span-4">
+        <div class="title">Add Employee</div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Name</label><input id="empName" placeholder="e.g. Maria Reyes" /></div>
+          <div><label>Role</label><select id="empRole"><option>Receptionist</option><option>Room Attendant</option><option>Maintenance</option><option>Head Maintenance</option><option>General Manager</option><option>Admin</option></select></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Email</label><input id="empEmail" placeholder="name@hotel.com" /></div>
+          <div><label>Phone</label><input id="empPhone" placeholder="09xx xxx xxxx" /></div>
+        </div>
+        <div style="margin-top:10px"><button id="btnAddEmp" class="primary">Add Employee</button> <span id="empMsg" class="msg"></span></div>
+      </article>
+      <article class="card span-8">
+        <div class="title">Employees</div>
+        <div style="overflow:auto"><table class="table" id="tblEmp"></table></div>
+      </article>
+    </section>
+
+    <!-- Admin: Inventory -->
+    <section class="grid" id="inventory" style="margin-top:16px">
+      <article class="card span-4">
+        <div class="title">Add Inventory Item</div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Item</label><input id="invItem" placeholder="e.g. Towel" /></div>
+          <div><label>Category</label><select id="invCat"><option>Linen</option><option>Amenities</option><option>Cleaning</option><option>Repair</option><option>Other</option></select></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Quantity</label><input id="invQty" type="number" min="0" step="1" /></div>
+          <div><label>Unit</label><input id="invUnit" placeholder="pcs/sets" /></div>
+        </div>
+        <div style="margin-top:10px"><button id="btnInvAdd" class="primary">Add / Update</button> <span id="invMsg" class="msg"></span></div>
+      </article>
+      <article class="card span-8">
+        <div class="title">Inventory</div>
+        <div style="overflow:auto"><table class="table" id="tblInv"></table></div>
+      </article>
+    </section>
+
+    <div style="height:40px"></div>
+  </main>
+</div>
+
+<script>
+  // Sidebar on mobile
+  const sidebar = document.getElementById('sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  const backdrop = document.getElementById('backdrop');
+  menuBtn && menuBtn.addEventListener('click', ()=>{ sidebar.classList.add('open'); backdrop.classList.add('show'); });
+  backdrop && backdrop.addEventListener('click', ()=>{ sidebar.classList.remove('open'); backdrop.classList.remove('show'); });
+
+  // Active nav on scroll
+  const navLinks = document.querySelectorAll('.nav a[href^="#"]');
+  const sections = document.querySelectorAll('section[id], main[id]');
+  
+  function setActiveNav(){
+    let current = 'top';
+    sections.forEach(section => {
+      const sectionTop = section.offsetTop;
+      const sectionHeight = section.clientHeight;
+      if(window.pageYOffset >= sectionTop - 100){
+        current = section.getAttribute('id');
+      }
+    });
+    navLinks.forEach(link => {
+      link.classList.remove('active');
+      if(link.getAttribute('href') === '#' + current){
+        link.classList.add('active');
+      }
+    });
+  }
+  
+  window.addEventListener('scroll', setActiveNav);
+  navLinks.forEach(link => {
+    link.addEventListener('click', function(e){
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+    });
+  });
+
+  // ===== Admin Data (localStorage) =====
+  const LS={ get(k,f){ try{return JSON.parse(localStorage.getItem(k))??f;}catch(e){return f;} }, set(k,v){ localStorage.setItem(k, JSON.stringify(v)); } };
+  const PAY_KEY='bmh_payments';
+  const AR_KEY='bmh_ar';
+  const CD_KEY='bmh_cash_deposits';
+  const DISC_KEY='bmh_discounts';
+  const EMP_KEY='bmh_employees';
+  const INV_KEY='bmh_inventory';
+
+  // Seed tables if empty
+  if(!LS.get(DISC_KEY, []).length){ LS.set(DISC_KEY,[{time:'09:10', ref:'BMH-1001', guest:'Walk-in', type:'Promo', amount:200},{time:'11:45', ref:'BMH-1018', guest:'Corporate', type:'Corp Disc', amount:350}]); }
+  if(!LS.get(EMP_KEY, []).length){ LS.set(EMP_KEY,[{name:'Alex', role:'Maintenance', email:'alex@hotel.com', phone:'0900 111 2222'},{name:'Bobby', role:'Maintenance', email:'bobby@hotel.com', phone:'0900 222 3333'},{name:'Maria', role:'Receptionist', email:'maria@hotel.com', phone:'0900 444 5555'}]); }
+  if(!LS.get(INV_KEY, []).length){ LS.set(INV_KEY,[{item:'Towel', cat:'Linen', qty:120, unit:'pcs'},{item:'Bedsheet', cat:'Linen', qty:80, unit:'sets'},{item:'Shampoo', cat:'Amenities', qty:240, unit:'pcs'},{item:'Toothbrush', cat:'Amenities', qty:200, unit:'pcs'}]); }
+
+  // Sales Report
+  function renderSales(){
+    const pays=LS.get(PAY_KEY, []);
+    const today = new Date().toDateString();
+    const rows = (pays||[]).filter(p=> new Date().toDateString()===today) || pays; // simple fallback
+    const tbl=document.getElementById('tblSales');
+    tbl.innerHTML = `<tr><th>Time</th><th>Ref</th><th>Guest</th><th>Method</th><th>Amount</th><th>Notes</th></tr>`+
+      (pays||[]).map(p=>`<tr><td>${p.time||''}</td><td>${p.ref||''}</td><td>${p.guest||''}</td><td>${p.method||''}</td><td>₱ ${(p.amount||0).toLocaleString()}</td><td>${p.notes||''}</td></tr>`).join('');
+  }
+
+  // Income Analysis
+  function renderIncome(){
+    const pays = LS.get(PAY_KEY, []);
+    const ar   = LS.get(AR_KEY, []);
+    const cd   = LS.get(CD_KEY, []);
+    const sum = (a,k)=> (a||[]).reduce((t,x)=> t + (+x[k]||0), 0);
+    document.getElementById('incPay').textContent = '₱ ' + sum(pays,'amount').toLocaleString();
+    document.getElementById('incAR').textContent  = '₱ ' + sum(ar,'amount').toLocaleString();
+    document.getElementById('incCD').textContent  = '₱ ' + sum(cd,'amount').toLocaleString();
+  }
+
+  // Discount Report
+  function renderDiscounts(){
+    const disc = LS.get(DISC_KEY, []);
+    const tbl=document.getElementById('tblDisc');
+    tbl.innerHTML = `<tr><th>Time</th><th>Ref</th><th>Guest</th><th>Type</th><th>Amount</th></tr>`+
+      (disc||[]).map(d=>`<tr><td>${d.time}</td><td>${d.ref}</td><td>${d.guest}</td><td>${d.type}</td><td>₱ ${(d.amount||0).toLocaleString()}</td></tr>`).join('');
+  }
+
+  // Employees
+  function renderEmployees(){
+    const emps = LS.get(EMP_KEY, []);
+    const tbl=document.getElementById('tblEmp');
+    tbl.innerHTML = `<tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th></tr>`+
+      (emps||[]).map(e=>`<tr><td>${e.name}</td><td>${e.role}</td><td>${e.email||''}</td><td>${e.phone||''}</td></tr>`).join('');
+  }
+  document.getElementById('btnAddEmp')?.addEventListener('click',()=>{
+    const name=(document.getElementById('empName').value||'').trim();
+    const role=document.getElementById('empRole').value;
+    const email=(document.getElementById('empEmail').value||'').trim();
+    const phone=(document.getElementById('empPhone').value||'').trim();
+    if(!name){ document.getElementById('empMsg').textContent='Enter name'; return; }
+    const emps=LS.get(EMP_KEY, []); emps.unshift({name,role,email,phone}); LS.set(EMP_KEY, emps);
+    document.getElementById('empMsg').textContent='Employee added'; setTimeout(()=>document.getElementById('empMsg').textContent='',1500);
+    ['empName','empEmail','empPhone'].forEach(id=>document.getElementById(id).value='');
+    renderEmployees();
+  });
+
+  // Inventory
+  function renderInventory(){
+    const inv = LS.get(INV_KEY, []);
+    const tbl=document.getElementById('tblInv');
+    tbl.innerHTML = `<tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit</th></tr>`+
+      (inv||[]).map(i=>`<tr><td>${i.item}</td><td>${i.cat}</td><td>${i.qty}</td><td>${i.unit||''}</td></tr>`).join('');
+  }
+  document.getElementById('btnInvAdd')?.addEventListener('click',()=>{
+    const item=(document.getElementById('invItem').value||'').trim();
+    const cat=document.getElementById('invCat').value;
+    const qty=+document.getElementById('invQty').value||0;
+    const unit=(document.getElementById('invUnit').value||'').trim();
+    if(!item){ document.getElementById('invMsg').textContent='Enter item name'; return; }
+    const inv=LS.get(INV_KEY, []);
+    const idx=inv.findIndex(x=>x.item.toLowerCase()===item.toLowerCase());
+    if(idx>-1){ inv[idx].qty = (+inv[idx].qty||0) + qty; inv[idx].cat=cat; inv[idx].unit=unit; }
+    else{ inv.unshift({item,cat,qty,unit}); }
+    LS.set(INV_KEY, inv);
+    document.getElementById('invMsg').textContent='Saved'; setTimeout(()=>document.getElementById('invMsg').textContent='',1500);
+    ['invItem','invQty','invUnit'].forEach(id=>document.getElementById(id).value='');
+    renderInventory();
+  });
+
+  // Initial admin renders
+  renderSales();
+  renderIncome();
+  renderDiscounts();
+  renderEmployees();
+  renderInventory();
+
+  
+  window.addEventListener('scroll', setActiveNav);
+  navLinks.forEach(link => {
+    link.addEventListener('click', function(e){
+      // Close mobile menu on click
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('show');
+    });
+  });
+
+  // ===== Dummy Data Generation =====
+  const days = Array.from({length:30}, (_,i)=>`Day ${i+1}`);
+  function movingAvg(arr, n){
+    return arr.map((_,i)=>{
+      const s = Math.max(0,i-n+1); const subset = arr.slice(s,i+1);
+      const avg = subset.reduce((a,b)=>a+b,0)/subset.length; return +avg.toFixed(2);
+    });
+  }
+
+  // Occupancy % (simulate seasonality)
+  const occ = days.map((_,i)=> Math.round(60 + 20*Math.sin(i/4) + (Math.random()*10-5)) );
+  const occ7 = movingAvg(occ,7);
+  const occ30 = movingAvg(occ,30);
+
+  // ADR and RevPAR (₱)
+  const adr = days.map((_,i)=> Math.round(2400 + 300*Math.sin(i/6) + (Math.random()*200-100)) );
+  const revpar = days.map((v,i)=> Math.round(adr[i]*(occ[i]/100)) );
+  const revparLY = revpar.map(v=> Math.round(v*(0.92 + Math.random()*0.1)) );
+
+  // Revenue mix stacks
+  const roomsRev = days.map(()=> Math.round(120000 + Math.random()*40000));
+  const fnbRev   = days.map(()=> Math.round(20000 + Math.random()*12000));
+  const extRev   = days.map(()=> Math.round(8000 + Math.random()*7000));
+
+  // Flow by hour
+  const hours = Array.from({length:24}, (_,i)=>`${i}:00`);
+  const bookingsByHour = hours.map(()=> Math.floor(Math.random()*6));
+  const checkinsByHour = hours.map((_,i)=> i>=14 && i<=20 ? Math.floor(Math.random()*8) : Math.floor(Math.random()*2));
+  const checkoutsByHour = hours.map((_,i)=> i>=10 && i<=12 ? Math.floor(Math.random()*10) : Math.floor(Math.random()*2));
+
+  // Channel performance table (Direct/Online via Receptionist, OTA, Walk-in via Receptionist, Corporate)
+  const channel = [
+    {name:'Direct/Online', bookings:120, revenue:480000, adr:2800, commission:0.00},
+    {name:'OTA (Booking.com)', bookings:160, revenue:520000, adr:2600, commission:0.15},
+    {name:'Walk-in', bookings:60, revenue:150000, adr:2500, commission:0.00},
+    {name:'Corporate', bookings:80, revenue:260000, adr:2400, commission:0.05},
+  ].map(r=> ({...r, net: Math.round(r.revenue*(1-r.commission))}))
+  .map(r=> ({...r, note: r.name.includes('Walk-in') || r.name.includes('Direct') ? 'By Receptionist' : ''}));
+
+  // Payments
+  const pay = [
+    {method:'Cash', gross:260000, feeRate:0},
+    {method:'Card (Terminal)', gross:320000, feeRate:0.022},
+    {method:'GCash', gross:180000, feeRate:0.02},
+    {method:'PayMaya/Xendit', gross:140000, feeRate:0.022},
+    {method:'A/R', gross:90000, feeRate:0},
+  ].map(p=> ({...p, fee: Math.round(p.gross*p.feeRate), net: Math.round(p.gross - p.gross*p.feeRate)}));
+
+  // A/R aging
+  const arAging = { '0–30': 80000, '31–60': 45000, '61–90': 20000, '90+': 12000 };
+  const arRows = [
+    {customer:'ABC Corp', age:'0–30', amount:30000},
+    {customer:'XYZ Trading', age:'31–60', amount:20000},
+    {customer:'City Univ.', age:'61–90', amount:12000},
+    {customer:'Delta Co.', age:'90+', amount:12000},
+  ];
+
+  // P&L
+  const pnlDays = Array.from({length:12},(_,i)=>`Day ${i+1}`);
+  const pnlRevenue = pnlDays.map(()=> Math.round(180000 + Math.random()*60000));
+  const pnlCOGS    = pnlDays.map(()=> Math.round(40000 + Math.random()*10000));
+  const pnlOpex    = pnlDays.map(()=> Math.round(30000 + Math.random()*15000));
+
+  // ===== KPIs =====
+  const todayIdx = occ.length-1;
+  const totalRooms = 28; // B Maison: 28 rooms total (King Size & Family Suite)
+  const roomsSold = Math.round(totalRooms * (occ[todayIdx]/100));
+  document.getElementById('kpiOcc').textContent = occ[todayIdx] + '%';
+  const occNote = `${roomsSold} of ${totalRooms} rooms occupied`;
+  document.getElementById('kpiOccNote').textContent = occNote;
+  document.getElementById('kpiOccNote').classList.toggle('bad', occ[todayIdx]<70);
+
+  document.getElementById('kpiAdr').textContent = `₱ ${adr[todayIdx].toLocaleString()}`;
+  document.getElementById('kpiAdrNote').textContent = `King Size & Family Suite (2 bed)`;
+
+  document.getElementById('kpiRevpar').textContent = `₱ ${revpar[todayIdx].toLocaleString()}`;
+  document.getElementById('kpiRevparNote').textContent = `vs LY: ₱ ${revparLY[todayIdx].toLocaleString()}`;
+
+  const todayBookings = bookingsByHour.reduce((a,b)=>a+b,0);
+  const todayCI = checkinsByHour.reduce((a,b)=>a+b,0);
+  const todayCO = checkoutsByHour.reduce((a,b)=>a+b,0);
+
+  // ===== Charts =====
+  function makeChart(ctx, config){ return new Chart(ctx, config); }
+
+  // ADR trend (line) + Room type distribution (stacked bars per day)
+  makeChart(document.getElementById('adrChart'), {
+    type:'line', data:{ labels:days, datasets:[ {label:'ADR', data:adr, tension:.3} ] },
+    options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:45, minRotation:45, autoSkip:true, maxTicksLimit:10 } } } }
+  });
+
+  makeChart(document.getElementById('mixChart'), {
+    type:'bar', data:{ labels:days, datasets:[
+      {label:'Rooms', data:roomsRev, stack:'mix'},
+      {label:'F&B', data:fnbRev, stack:'mix'},
+      {label:'Extras', data:extRev, stack:'mix'}
+    ]}, options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ stacked:true, ticks:{ maxRotation:45, minRotation:45, autoSkip:true, maxTicksLimit:10 } }, y:{ stacked:true } } }
+  });
+
+  // By hour charts
+  makeChart(document.getElementById('bookingsHour'), { type:'bar', data:{ labels:hours, datasets:[{label:'Bookings', data:bookingsByHour}] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:45, minRotation:45, autoSkip:true, maxTicksLimit:12 } } } } });
+  makeChart(document.getElementById('ioHour'), { type:'bar', data:{ labels:hours, datasets:[{label:'Check-ins', data:checkinsByHour}, {label:'Check-outs', data:checkoutsByHour}] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:45, minRotation:45, autoSkip:true, maxTicksLimit:12 } } } } });
+
+  // Channel table
+  const chanTbl = document.getElementById('channelTable');
+  chanTbl.innerHTML = `<tr><th>Channel</th><th>Bookings</th><th>Revenue</th><th>ADR</th><th>Commission %</th><th>Net Revenue</th></tr>` +
+    channel.map(r=>`<tr><td>${r.name}</td><td>${r.bookings}</td><td>₱ ${r.revenue.toLocaleString()}</td><td>₱ ${r.adr.toLocaleString()}</td><td>${Math.round(r.commission*100)}%</td><td>₱ ${r.net.toLocaleString()}</td></tr>`).join('');
+
+  // Payment mix
+  makeChart(document.getElementById('payMix'), { type:'doughnut', data:{ labels:pay.map(p=>p.method), datasets:[{ data:pay.map(p=>p.gross) }] }, options:{ responsive:true, maintainAspectRatio:false } });
+  const payTbl = document.getElementById('payTable');
+  payTbl.innerHTML = `<tr><th>Method</th><th>Gross</th><th>Fee</th><th>Net</th></tr>` + pay.map(p=>`<tr><td>${p.method}</td><td>₱ ${p.gross.toLocaleString()}</td><td>₱ ${p.fee.toLocaleString()}</td><td>₱ ${p.net.toLocaleString()}</td></tr>`).join('');
+
+  // A/R aging
+  makeChart(document.getElementById('arChart'), { type:'bar', data:{ labels:Object.keys(arAging), datasets:[{label:'Amount', data:Object.values(arAging)}] }, options:{ responsive:true, maintainAspectRatio:false } });
+  const arTbl = document.getElementById('arTable');
+  arTbl.innerHTML = `<tr><th>Customer</th><th>Age</th><th>Amount</th></tr>` + arRows.map(r=>`<tr><td>${r.customer}</td><td>${r.age}</td><td>₱ ${r.amount.toLocaleString()}</td></tr>`).join('');
+
+  // P&L combo (bars + margin line)
+  const grossProfit = pnlRevenue.map((rev,i)=> rev - pnlCOGS[i] - pnlOpex[i]);
+  const margin = grossProfit.map((gp,i)=> +( (gp / pnlRevenue[i]) * 100 ).toFixed(1));
+  makeChart(document.getElementById('pnlChart'), {
+    data:{ labels:pnlDays, datasets:[
+      {type:'bar', label:'Revenue', data:pnlRevenue, order:2},
+      {type:'bar', label:'COGS', data:pnlCOGS, order:2},
+      {type:'bar', label:'Opex', data:pnlOpex, order:2},
+      {type:'line', label:'Margin %', data:margin, yAxisID:'y1', order:1}
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, scales:{ x:{ ticks:{ maxRotation:45, minRotation:45 } }, y:{ beginAtZero:true }, y1:{ position:'right', ticks:{ callback:v=>v+'%' } } } }
+  });
+</script>
+</body>
+</html>

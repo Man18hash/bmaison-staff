@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B Maison — Receptionist Dashboard</title>
+  <style>
+    :root{ --bg:#f3f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --brand:#111827; --border:#e5e7eb }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    html{scroll-behavior:smooth}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg)}
+
+    /* Layout */
+    .layout{display:flex; min-height:100vh; position:relative}
+    aside{background:var(--brand); color:#e5e7eb; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; z-index:50; box-shadow:2px 0 8px rgba(0,0,0,.1)}
+    aside.open{transform:translateX(0)}
+    main{flex:1; width:100%; margin-left:0; transition:margin-left .25s ease; min-height:100vh; padding:18px 20px}
+    .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:40}
+    .backdrop.show{display:block}
+    @media (min-width:960px){ aside{transform:translateX(0)} main{margin-left:260px} .backdrop{display:none!important} }
+
+    /* Sidebar */
+    .logo{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06); flex-shrink:0}
+    .logo span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:12px}
+    .nav{padding:8px; flex:1; overflow-y:auto}
+    .nav a{display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:12px; color:#d1d5db; text-decoration:none}
+    .nav a:hover{background:#1f2937; color:#fff}
+    .nav a.active{background:#0b1220; color:#fff}
+    .push-bottom{margin-top:auto; padding:8px; border-top:1px solid rgba(255,255,255,.06)}
+    .logout{display:flex; gap:10px; align-items:center; padding:10px 12px; color:#fecaca; text-decoration:none; border-radius:12px}
+    .logout:hover{background:#331f1f}
+
+    /* Content */
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0}
+    header .menu{display:inline-flex; background:#fff; border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer}
+    @media (min-width:960px){ header .menu{display:none} }
+
+    .kpis{display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-bottom:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px; box-shadow:0 4px 14px rgba(0,0,0,.04)}
+    .title{font-size:13px; color:var(--muted); margin:0 0 6px}
+    .big{font-size:26px; font-weight:800}
+    .grid{display:grid; gap:16px; grid-template-columns:repeat(12, 1fr)}
+    .span-6{grid-column:span 12} .span-4{grid-column:span 12}
+    @media (min-width:960px){ .span-6{grid-column:span 6} .span-4{grid-column:span 4} }
+
+    .table{width:100%; border-collapse:collapse; font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border); padding:10px; text-align:left}
+    .table th{font-size:12px; color:var(--muted)}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .row > *{flex:1}
+    .actions button{margin-right:6px}
+    input,select,textarea,button{font:inherit}
+    input,select,textarea{width:100%; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff}
+    button{padding:10px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer}
+    button.primary{background:#111827; color:#fff; border-color:#111827}
+    .badge{display:inline-flex; align-items:center; gap:6px; background:#e7f5ff; color:#075985; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #bae6fd}
+    /* Rooms grid */
+    .legend{display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:var(--muted); margin:6px 0 8px}
+    .legend span{display:inline-flex; align-items:center; gap:6px}
+    .dot{width:10px; height:10px; border-radius:999px; display:inline-block}
+    .rooms-grid{display:grid; gap:10px; grid-template-columns:repeat(auto-fill, minmax(120px,1fr))}
+    .rooms-groups{display:grid; gap:14px; grid-template-columns:repeat(12, 1fr)}
+    .group{grid-column:span 12}
+    @media (min-width:960px){ .group{grid-column:span 4} }
+    .group .hdr{display:flex; align-items:center; justify-content:space-between; font-weight:600; margin:2px 0 6px}
+    .count{font-size:12px; color:var(--muted)}
+    .tile{background:#fff; border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:6px; text-align:center; min-height:82px}
+    .tile .room{font-weight:800; font-size:16px}
+    .tile .type{font-size:12px; color:var(--muted)}
+    .s-avail{background:#ecfdf5; border-color:#a7f3d0}
+    .s-occ{background:#fee2e2; border-color:#fecaca}
+    .s-resv{background:#fef9c3; border-color:#fde68a}
+    .s-mnt{background:#ffedd5; border-color:#fed7aa}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar">
+    <div class="logo"><span>B MAISON HOTEL</span></div>
+    <nav class="nav">
+      <a class="active" href="#top">🏠 Receptionist</a>
+      <a href="#bookings">🧾 Online Bookings</a>
+      <a href="#rooms">🛏️ Rooms</a>
+      <a href="#payments">💳 Record Payment</a>
+      <a href="#transactions">📒 Transactions</a>
+    </nav>
+    <div class="push-bottom">
+      <a class="logout" href="index.html">↩ Logout</a>
+    </div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="top">
+    <header>
+      <h1>Front Desk — Today</h1>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <!-- KPIs -->
+    <section class="kpis">
+      <div class="card"><div class="title">Arrivals (Today)</div><div class="big" id="kpiArr">—</div></div>
+      <div class="card"><div class="title">Pending Online</div><div class="big" id="kpiPending">—</div></div>
+      <div class="card"><div class="title">Walk-ins (Today)</div><div class="big" id="kpiWalkin">—</div></div>
+      <div class="card"><div class="title">Payments Collected</div><div class="big" id="kpiPaid">₱ 0</div></div>
+    </section>
+
+    <!-- Online Bookings -->
+    <section class="card" id="bookings">
+      <div class="title">Online Bookings — Awaiting Confirmation</div>
+      <div style="overflow:auto">
+        <table class="table" id="bookingsTable"></table>
+      </div>
+    </section>
+
+    <!-- Rooms Status (28 rooms) -->
+    <section class="card" id="rooms" style="margin-top:16px">
+      <div class="title">Rooms Status (28)</div>
+      <div class="legend">
+        <span><i class="dot" style="background:#22c55e"></i> Available</span>
+        <span><i class="dot" style="background:#ef4444"></i> Occupied</span>
+        <span><i class="dot" style="background:#eab308"></i> Reserved</span>
+        <span><i class="dot" style="background:#f97316"></i> Under Maintenance</span>
+      </div>
+      <div class="rooms-groups">
+        <div class="group">
+          <div class="hdr">King Size <span class="count" id="cntKing">0</span></div>
+          <div class="rooms-grid" id="gridKing"></div>
+        </div>
+        <div class="group">
+          <div class="hdr">Two Beds <span class="count" id="cntTwo">0</span></div>
+          <div class="rooms-grid" id="gridTwo"></div>
+        </div>
+        <div class="group">
+          <div class="hdr">Family Suite <span class="count" id="cntFam">0</span></div>
+          <div class="rooms-grid" id="gridFam"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Payments + Transactions -->
+    <section class="grid" id="payments" style="margin-top:16px">
+      <article class="card span-6">
+        <div class="title">Record a Payment</div>
+        <div class="row" style="margin-top:8px">
+          <div><label>Booking Ref</label><input id="payRef" placeholder="e.g. BMH-1024" /></div>
+          <div><label>Method</label>
+            <select id="payMethod">
+              <option>Cash</option>
+              <option>Card (Terminal)</option>
+              <option>GCash</option>
+              <option>PayMaya/Xendit</option>
+              <option>A/R</option>
+            </select>
+          </div>
+          <div><label>Amount (₱)</label><input id="payAmount" type="number" min="0" step="1" /></div>
+        </div>
+        <div style="margin-top:8px"><label>Notes</label><textarea id="payNotes" rows="3" placeholder="Optional"></textarea></div>
+        <div style="margin-top:10px"><button class="primary" id="btnRecord">Record Payment</button></div>
+      </article>
+      <article class="card span-6" id="transactions">
+        <div class="title">Today's Transactions</div>
+        <div style="overflow:auto">
+          <table class="table" id="txTable"></table>
+        </div>
+      </article>
+    </section>
+
+    <div style="height:40px"></div>
+  </main>
+</div>
+
+<script>
+  // Sidebar mobile behavior
+  const sidebar = document.getElementById('sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  const backdrop = document.getElementById('backdrop');
+  menuBtn && menuBtn.addEventListener('click', ()=>{ sidebar.classList.add('open'); backdrop.classList.add('show'); });
+  backdrop && backdrop.addEventListener('click', ()=>{ sidebar.classList.remove('open'); backdrop.classList.remove('show'); });
+
+  // Active nav on scroll
+  const navLinks = document.querySelectorAll('.nav a[href^="#"]');
+  const sections = document.querySelectorAll('section[id], main[id]');
+  function setActiveNav(){
+    let current = 'top';
+    sections.forEach(section => { if(window.pageYOffset >= section.offsetTop - 100){ current = section.id; } });
+    navLinks.forEach(a => { a.classList.toggle('active', a.getAttribute('href') === '#' + current); });
+  }
+  window.addEventListener('scroll', setActiveNav);
+  navLinks.forEach(a=> a.addEventListener('click', ()=>{ sidebar.classList.remove('open'); backdrop.classList.remove('show'); }));
+
+  // ===== In-memory Data =====
+  const totalRooms = 28;
+  const bookings = [
+    {ref:'BMH-1021', guest:'Santos, Maria', type:'King Size',   checkin:'Today',    nights:2, amount:5200, status:'Pending'},
+    {ref:'BMH-1022', guest:'Reyes, Juan',  type:'Family Suite', checkin:'Today',    nights:1, amount:4200, status:'Pending'},
+    {ref:'BMH-1023', guest:'Lee, Ana',     type:'King Size',    checkin:'Tomorrow', nights:3, amount:7800, status:'Pending'},
+    {ref:'BMH-1024', guest:'Garcia, Paolo',type:'Family Suite', checkin:'Today',    nights:2, amount:7600, status:'Pending'},
+    {ref:'BMH-1025', guest:'Chen, Liza',   type:'King Size',    checkin:'Today',    nights:1, amount:2600, status:'Pending'}
+  ];
+  let transactions = [
+    {time:'10:05', ref:'WALK-IN-01', guest:'Walk-in Guest', method:'Cash', amount:2600, notes:'King Size 1N'},
+    {time:'11:20', ref:'BMH-1019', guest:'De la Cruz, Nina', method:'Card (Terminal)', amount:4800, notes:'Online prepay top-up'},
+  ];
+  let walkinsToday = 3; // sample
+
+  // ===== Renderers =====
+  function peso(n){ return '₱ ' + (+n).toLocaleString(); }
+  function renderKPIs(){
+    const arrivals = bookings.filter(b=>b.checkin==='Today').length + walkinsToday;
+    const pending = bookings.filter(b=>b.status==='Pending').length;
+    const paidSum = transactions.reduce((a,t)=>a+Number(t.amount||0),0);
+    document.getElementById('kpiArr').textContent = arrivals;
+    document.getElementById('kpiPending').textContent = pending;
+    document.getElementById('kpiWalkin').textContent = walkinsToday;
+    document.getElementById('kpiPaid').textContent = peso(paidSum);
+  }
+
+  function renderBookings(){
+    const tbl = document.getElementById('bookingsTable');
+    tbl.innerHTML = `<tr><th>Ref</th><th>Guest</th><th>Room</th><th>Check-in</th><th>Nights</th><th>Amount</th><th>Status</th><th>Actions</th></tr>` +
+      bookings.map(b=>`<tr>
+        <td>${b.ref}</td><td>${b.guest}</td><td>${b.type}</td><td>${b.checkin}</td><td>${b.nights}</td><td>${peso(b.amount)}</td>
+        <td>${b.status === 'Confirmed' ? '<span class="badge">Confirmed</span>' : b.status}</td>
+        <td class="actions">
+          <button data-ref="${b.ref}" class="confirm" ${b.status==='Confirmed'?'disabled':''}>Confirm</button>
+          <button data-ref="${b.ref}" class="cancel">Cancel</button>
+        </td>
+      </tr>`).join('');
+
+    tbl.querySelectorAll('button.confirm').forEach(btn=>btn.addEventListener('click', e=>{
+      const ref = e.target.getAttribute('data-ref');
+      const item = bookings.find(x=>x.ref===ref);
+      if(item){ item.status = 'Confirmed'; renderBookings(); renderKPIs(); }
+    }));
+    tbl.querySelectorAll('button.cancel').forEach(btn=>btn.addEventListener('click', e=>{
+      const ref = e.target.getAttribute('data-ref');
+      const idx = bookings.findIndex(x=>x.ref===ref);
+      if(idx>-1){ bookings.splice(idx,1); renderBookings(); renderKPIs(); }
+    }));
+  }
+
+  function renderTx(){
+    const tbl = document.getElementById('txTable');
+    tbl.innerHTML = `<tr><th>Time</th><th>Ref</th><th>Guest</th><th>Method</th><th>Amount</th><th>By</th><th>Notes</th></tr>` +
+      transactions.map(t=>`<tr>
+        <td>${t.time}</td><td>${t.ref}</td><td>${t.guest}</td><td>${t.method}</td><td>${peso(t.amount)}</td><td>Receptionist</td><td>${t.notes||''}</td>
+      </tr>`).join('');
+  }
+
+  // Record payment
+  document.getElementById('btnRecord').addEventListener('click', ()=>{
+    const ref = document.getElementById('payRef').value.trim();
+    const method = document.getElementById('payMethod').value;
+    const amount = Number(document.getElementById('payAmount').value||0);
+    const notes = document.getElementById('payNotes').value.trim();
+    if(!ref || amount<=0){ alert('Enter booking ref and a valid amount.'); return; }
+    const booking = bookings.find(b=>b.ref===ref);
+    const guest = booking ? booking.guest : '—';
+    const now = new Date();
+    const time = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    transactions.unshift({time, ref, guest, method, amount, notes});
+    renderTx(); renderKPIs();
+    document.getElementById('payRef').value='';
+    document.getElementById('payAmount').value='';
+    document.getElementById('payNotes').value='';
+  });
+
+  // Initial render
+  renderKPIs();
+  renderBookings();
+  renderTx();
+
+  // ===== Rooms Grid (28 rooms) =====
+  // Safe localStorage helper (used for clients/tickets lookup)
+  const LS={ get(k,f){ try{return JSON.parse(localStorage.getItem(k))??f;}catch(e){return f;} }, set(k,v){ localStorage.setItem(k, JSON.stringify(v)); } };
+  const CLIENTS_KEY='bmh_clients';
+  const TICKET_KEY='bmh_tickets';
+  // Seed defaults if empty so grid always shows meaningful state
+  if(!LS.get(CLIENTS_KEY, []).length){
+    LS.set(CLIENTS_KEY,[
+      {ref:'BMH-1021', name:'Santos, Maria', room:'204', nights:2, amount:5200, source:'Online', checkin:'Today', status:'In-house'},
+      {ref:'BMH-1022', name:'Reyes, Juan',  room:'307', nights:1, amount:4200, source:'OTA',    checkin:'Today', status:'Arriving'},
+      {ref:'BMH-1023', name:'Lee, Ana',     room:'205', nights:3, amount:7800, source:'Online', checkin:'Tomorrow', status:'Booked'}
+    ]);
+  }
+  if(!LS.get(TICKET_KEY, []).length){
+    const now=new Date().toISOString();
+    LS.set(TICKET_KEY,[{id:'T100500', room:'115', issue:'TV not working', priority:'Low', due:'', assignee:'', notes:'', parts:'', photo:'', status:'Open', created:now, logs:[]}]);
+  }
+  function seedRooms28(){
+    // 28 rooms including 115, 204, 205, 307
+    const nums=[
+      101,102,103,104,105,106,107,
+      111,112,113,114,115,116,117,118,
+      201,202,203,204,205,206,
+      301,302,303,304,305,306,307
+    ];
+    // Map type by floor (with slight mix): 1=King, 2=Two Beds, 3=Family Suite
+    return nums.map(n=>({
+      room:String(n),
+      type: String(n).startsWith('1') ? 'King Size' : (String(n).startsWith('2') ? 'Two Beds' : 'Family Suite')
+    }));
+  }
+  const rooms28 = seedRooms28();
+
+  function computeRoomStatus(){
+    const clients = LS.get(CLIENTS_KEY, []);
+    const tickets = LS.get(TICKET_KEY, []);
+    const occSet = new Set(clients.filter(c=> (c.status||'').toLowerCase().includes('in-house')).map(c=> String(c.room)));
+    const resSet = new Set(clients.filter(c=> ['arriving','booked','reserved'].includes((c.status||'').toLowerCase())).map(c=> String(c.room)));
+    const mntSet = new Set(tickets.filter(t=> ['Open','In Progress'].includes(t.status)).map(t=> String(t.room)));
+    return rooms28.map(r=>{
+      let s='avail';
+      if(mntSet.has(r.room)) s='mnt';
+      else if(occSet.has(r.room)) s='occ';
+      else if(resSet.has(r.room)) s='resv';
+      return {...r, status:s};
+    });
+  }
+
+  function renderRooms(){
+    const data=computeRoomStatus();
+    const king=data.filter(r=>r.type==='King Size');
+    const two =data.filter(r=>r.type==='Two Beds');
+    const fam =data.filter(r=>r.type==='Family Suite');
+    function tiles(list){
+      return list.map(r=>{
+        const cls = r.status==='avail'?'s-avail': r.status==='occ'?'s-occ': r.status==='resv'?'s-resv':'s-mnt';
+        const label = r.status==='avail'?'Available': r.status==='occ'?'Occupied': r.status==='resv'?'Reserved':'Under Maintenance';
+        return `<div class="tile ${cls}">
+          <div class="room">${r.room}</div>
+          <div class="type">${r.type}</div>
+          <div class="help">${label}</div>
+        </div>`
+      }).join('');
+    }
+    document.getElementById('gridKing').innerHTML=tiles(king);
+    document.getElementById('gridTwo').innerHTML =tiles(two);
+    document.getElementById('gridFam').innerHTML =tiles(fam);
+    document.getElementById('cntKing').textContent=king.length;
+    document.getElementById('cntTwo').textContent =two.length;
+    document.getElementById('cntFam').textContent =fam.length;
+  }
+
+  renderRooms();
+</script>
+</body>
+</html>

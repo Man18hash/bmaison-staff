@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Head Maintenance dashboard: responsive sidebar, KPIs, create ticket form, tickets table with filters and actions, uses localStorage to store tickets and staff. Supports assigning to maintenance staff and updating status/priority/due dates and parts. Smooth scroll, active nav.</title>
+  <style>
+    :root{ --bg:#f3f5f9; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --brand:#111827; --border:#e5e7eb }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    html{scroll-behavior:smooth}
+    body{margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink); background:var(--bg)}
+
+    .layout{display:flex; min-height:100vh; position:relative}
+    aside{background:var(--brand); color:#e5e7eb; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; width:260px; transform:translateX(-100%); transition:transform .25s ease; z-index:50; box-shadow:2px 0 8px rgba(0,0,0,.1)}
+    aside.open{transform:translateX(0)}
+    main{flex:1; width:100%; margin-left:0; transition:margin-left .25s ease; min-height:100vh; padding:18px 20px}
+    .backdrop{position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:40}
+    .backdrop.show{display:block}
+    @media (min-width:960px){ aside{transform:translateX(0)} main{margin-left:260px} .backdrop{display:none!important} }
+
+    .logo{display:flex; align-items:center; gap:10px; padding:16px 18px; border-bottom:1px solid rgba(255,255,255,.06)}
+    .logo span{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:12px}
+    .nav{padding:8px; flex:1; overflow-y:auto}
+    .nav a{display:flex; align-items:center; gap:10px; padding:10px 12px; margin:6px 0; border-radius:12px; color:#d1d5db; text-decoration:none}
+    .nav a:hover{background:#1f2937; color:#fff}
+    .nav a.active{background:#0b1220; color:#fff}
+    .push-bottom{margin-top:auto; padding:8px; border-top:1px solid rgba(255,255,255,.06)}
+    .logout{display:flex; gap:10px; align-items:center; padding:10px 12px; color:#fecaca; text-decoration:none; border-radius:12px}
+    .logout:hover{background:#331f1f}
+
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    header h1{font-size:22px; margin:0}
+    header .menu{display:inline-flex; background:#fff; border:1px solid var(--border); padding:8px 10px; border-radius:10px; cursor:pointer}
+    @media (min-width:960px){ header .menu{display:none} }
+
+    .kpis{display:grid; gap:14px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); margin-bottom:16px}
+    .card{background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px}
+    .title{font-size:13px; color:var(--muted); margin:0 0 6px}
+    .big{font-size:26px; font-weight:800}
+    .grid{display:grid; gap:16px; grid-template-columns:repeat(12, 1fr)}
+    .span-6{grid-column:span 12} .span-4{grid-column:span 12}
+    @media (min-width:960px){ .span-6{grid-column:span 6} .span-4{grid-column:span 4} }
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .row > *{flex:1}
+    .table{width:100%; border-collapse:collapse; font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border); padding:10px; text-align:left}
+    .table th{font-size:12px; color:var(--muted)}
+    input,select,textarea,button{font:inherit}
+    input,select,textarea{width:100%; padding:10px; border:1px solid var(--border); border-radius:10px; background:#fff}
+    button{padding:10px 12px; border:1px solid var(--border); background:#fff; border-radius:10px; cursor:pointer}
+    button.primary{background:#111827; color:#fff; border-color:#111827}
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid}
+    .b-open{background:#fff1f2; color:#9f1239; border-color:#fecdd3}
+    .b-ip{background:#f1f5f9; color:#0f172a; border-color:#e2e8f0}
+    .b-done{background:#ecfdf5; color:#065f46; border-color:#a7f3d0}
+    .b-pri{background:#fff7d6; color:#7a5b00; border-color:#fde68a}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside id="sidebar">
+    <div class="logo"><span>B MAISON HOTEL</span></div>
+    <nav class="nav">
+      <a class="active" href="#top">🛠️ Head Maintenance</a>
+      <a href="#create">➕ Create Ticket</a>
+      <a href="#tickets">📋 Tickets</a>
+    </nav>
+    <div class="push-bottom"><a class="logout" href="index.html">↩ Logout</a></div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <main id="top">
+    <header>
+      <h1>Head Maintenance — Dashboard</h1>
+      <button class="menu" id="menuBtn">☰</button>
+    </header>
+
+    <section class="kpis">
+      <div class="card"><div class="title">Open</div><div class="big" id="kOpen">—</div></div>
+      <div class="card"><div class="title">In Progress</div><div class="big" id="kIP">—</div></div>
+      <div class="card"><div class="title">Completed (7d)</div><div class="big" id="kDone">—</div></div>
+      <div class="card"><div class="title">Overdue</div><div class="big" id="kOver">—</div></div>
+    </section>
+
+    <section class="card" id="create">
+      <div class="title">Create Ticket</div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Room #</label><input id="tRoom" placeholder="e.g. 203" /></div>
+        <div><label>Issue</label><input id="tIssue" placeholder="e.g. AC not cooling" /></div>
+        <div><label>Priority</label>
+          <select id="tPriority"><option>Low</option><option selected>Medium</option><option>High</option></select>
+        </div>
+        <div><label>Due Date</label><input id="tDue" type="date" /></div>
+        <div><label>Assign To</label>
+          <select id="tAssignee"></select>
+        </div>
+      </div>
+      <div style="margin-top:8px"><label>Notes</label><textarea id="tNotes" rows="3" placeholder="Details/diagnostics"></textarea></div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Parts (comma-separated)</label><input id="tParts" placeholder="e.g. Filter, Freon" /></div>
+        <div><label>Photo URL</label><input id="tPhoto" placeholder="https://..." /></div>
+      </div>
+      <div style="margin-top:10px"><button class="primary" id="btnCreate">Create Ticket</button></div>
+    </section>
+
+    <section class="card" id="tickets" style="margin-top:16px">
+      <div class="title">Tickets</div>
+      <div class="row" style="margin:8px 0">
+        <div><label>Filter Status</label>
+          <select id="fStatus"><option value="">All</option><option>Open</option><option>In Progress</option><option>Completed</option><option>Closed</option></select>
+        </div>
+        <div><label>Priority</label>
+          <select id="fPriority"><option value="">All</option><option>Low</option><option>Medium</option><option>High</option></select>
+        </div>
+        <div><label>Room</label><input id="fRoom" placeholder="e.g. 203" /></div>
+      </div>
+      <div style="overflow:auto">
+        <table class="table" id="ticketsTable"></table>
+      </div>
+    </section>
+
+    <div style="height:40px"></div>
+  </main>
+</div>
+
+<script>
+  // Sidebar mobile
+  const sidebar = document.getElementById('sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  const backdrop = document.getElementById('backdrop');
+  menuBtn && menuBtn.addEventListener('click', ()=>{ sidebar.classList.add('open'); backdrop.classList.add('show'); });
+  backdrop && backdrop.addEventListener('click', ()=>{ sidebar.classList.remove('open'); backdrop.classList.remove('show'); });
+  const navLinks = document.querySelectorAll('.nav a[href^="#"]');
+  const sections = document.querySelectorAll('section[id], main[id]');
+  function setActiveNav(){ let current='top'; sections.forEach(s=>{ if(pageYOffset>=s.offsetTop-100) current=s.id; }); navLinks.forEach(a=>a.classList.toggle('active', a.getAttribute('href')==='#'+current)); }
+  addEventListener('scroll', setActiveNav);
+
+  // Data model in localStorage
+  const LS = {
+    get(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch(e){ return fallback; } },
+    set(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+  };
+  const STAFF_KEY = 'bmh_staff';
+  const TICKET_KEY = 'bmh_tickets';
+  const staffDefault = [
+    {id:'mt1', name:'Alex'}, {id:'mt2', name:'Bobby'}, {id:'mt3', name:'Carlos'}
+  ];
+  const staff = LS.get(STAFF_KEY, staffDefault);
+  LS.set(STAFF_KEY, staff);
+  let tickets = LS.get(TICKET_KEY, []);
+  if(!tickets || tickets.length===0){
+    const today = new Date();
+    const fmt = d=> d.toISOString().slice(0,10);
+    tickets = [
+      { id:'T100231', room:'204', issue:'AC not cooling', priority:'High',  due:fmt(new Date(today.getFullYear(),today.getMonth(),today.getDate()+1)), assignee:'mt1', notes:'Guest reported at check-in', parts:'Filter', photo:'', status:'Open', created:new Date().toISOString(), logs:[] },
+      { id:'T100232', room:'307', issue:'Shower leak',     priority:'Medium',due:fmt(new Date(today.getFullYear(),today.getMonth(),today.getDate()+2)), assignee:'mt2', notes:'Housekeeping noted wet floor', parts:'Sealant', photo:'', status:'In Progress', created:new Date().toISOString(), logs:[{type:'status', status:'In Progress', at:new Date().toISOString()}] },
+      { id:'T100233', room:'115', issue:'TV no signal',     priority:'Low',   due:fmt(new Date(today.getFullYear(),today.getMonth(),today.getDate()+3)), assignee:'mt3', notes:'Needs channel scan', parts:'Coax cable', photo:'', status:'Open', created:new Date().toISOString(), logs:[] },
+      { id:'T100234', room:'221', issue:'Door lock battery',priority:'Medium',due:fmt(new Date(today.getFullYear(),today.getMonth(),today.getDate()-1)), assignee:'mt1', notes:'Replaced batteries', parts:'AA Batteries', photo:'', status:'Completed', created:new Date(today.getTime()-3*864e5).toISOString(), logs:[{type:'status', status:'Completed', at:new Date(today.getTime()-1*864e5).toISOString()}], partsUsed:[{part:'AA Battery', qty:4, cost:160}] },
+    ];
+    LS.set(TICKET_KEY, tickets);
+  }
+
+  // Populate assignee list
+  const selAssignee = document.getElementById('tAssignee');
+  selAssignee.innerHTML = staff.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+
+  // Create ticket
+  document.getElementById('btnCreate').addEventListener('click', ()=>{
+    const room = document.getElementById('tRoom').value.trim();
+    const issue = document.getElementById('tIssue').value.trim();
+    const priority = document.getElementById('tPriority').value;
+    const due = document.getElementById('tDue').value;
+    const assignee = document.getElementById('tAssignee').value;
+    const notes = document.getElementById('tNotes').value.trim();
+    const parts = document.getElementById('tParts').value.trim();
+    const photo = document.getElementById('tPhoto').value.trim();
+    if(!room || !issue){ alert('Room and Issue are required.'); return; }
+    const id = 'T' + Math.floor(Math.random()*1e6);
+    tickets.unshift({ id, room, issue, priority, due, assignee, notes, parts, photo, status:'Open', created:new Date().toISOString(), logs:[] });
+    LS.set(TICKET_KEY, tickets); render();
+    document.getElementById('tRoom').value=''; document.getElementById('tIssue').value=''; document.getElementById('tNotes').value=''; document.getElementById('tParts').value=''; document.getElementById('tPhoto').value='';
+  });
+
+  // Render tickets and KPIs
+  function badgeStatus(s){ return s==='Open'?'<span class="badge b-open">Open</span>': s==='In Progress'?'<span class="badge b-ip">In Progress</span>': s==='Completed'?'<span class="badge b-done">Completed</span>':'<span class="badge">Closed</span>'; }
+  function render(){
+    const fS = document.getElementById('fStatus').value; const fP = document.getElementById('fPriority').value; const fR = document.getElementById('fRoom').value.trim();
+    const filtered = tickets.filter(t=> (!fS || t.status===fS) && (!fP || t.priority===fP) && (!fR || t.room.includes(fR)) );
+    const tbl = document.getElementById('ticketsTable');
+    tbl.innerHTML = `<tr><th>ID</th><th>Room</th><th>Issue</th><th>Priority</th><th>Due</th><th>Assignee</th><th>Status</th><th>Actions</th></tr>` +
+      filtered.map(t=>`<tr>
+        <td>${t.id}</td><td>${t.room}</td><td>${t.issue}</td><td><span class="badge b-pri">${t.priority}</span></td><td>${t.due||'—'}</td>
+        <td>${(staff.find(s=>s.id===t.assignee)||{}).name||'—'}</td><td>${badgeStatus(t.status)}</td>
+        <td>
+          <button data-id="${t.id}" class="edit">Edit</button>
+          <button data-id="${t.id}" class="reassign">Assign</button>
+          <button data-id="${t.id}" class="markip">Start</button>
+          <button data-id="${t.id}" class="complete">Complete</button>
+          <button data-id="${t.id}" class="close">Close</button>
+        </td>
+      </tr>`).join('');
+
+    // KPIs
+    const now = new Date();
+    const past7 = new Date(now.getTime()-7*864e5);
+    const done7 = tickets.filter(t=> t.status==='Completed' && new Date(t.created)>past7).length;
+    const over = tickets.filter(t=> t.status!=='Completed' && t.due && new Date(t.due)<now).length;
+    document.getElementById('kOpen').textContent = tickets.filter(t=>t.status==='Open').length;
+    document.getElementById('kIP').textContent = tickets.filter(t=>t.status==='In Progress').length;
+    document.getElementById('kDone').textContent = done7;
+    document.getElementById('kOver').textContent = over;
+
+    // wire actions
+    tbl.querySelectorAll('button.edit').forEach(b=>b.addEventListener('click',()=>editTicket(b.dataset.id)));
+    tbl.querySelectorAll('button.reassign').forEach(b=>b.addEventListener('click',()=>reassign(b.dataset.id)));
+    tbl.querySelectorAll('button.markip').forEach(b=>b.addEventListener('click',()=>setStatus(b.dataset.id,'In Progress')));
+    tbl.querySelectorAll('button.complete').forEach(b=>b.addEventListener('click',()=>setStatus(b.dataset.id,'Completed')));
+    tbl.querySelectorAll('button.close').forEach(b=>b.addEventListener('click',()=>setStatus(b.dataset.id,'Closed')));
+  }
+
+  // Update helpers
+  function setStatus(id, status){ const t=tickets.find(x=>x.id===id); if(!t) return; t.status=status; t.logs.push({at:new Date().toISOString(), status}); LS.set(TICKET_KEY,tickets); render(); }
+  function reassign(id){ const t=tickets.find(x=>x.id===id); if(!t) return; const to = prompt('Assign to (enter staff ID):\n'+staff.map(s=>`${s.id} — ${s.name}`).join('\n'), t.assignee||''); if(to){ t.assignee=to; LS.set(TICKET_KEY,tickets); render(); } }
+  function editTicket(id){ const t=tickets.find(x=>x.id===id); if(!t) return; const issue=prompt('Issue', t.issue)||t.issue; const priority=prompt('Priority (Low/Medium/High)', t.priority)||t.priority; const due=prompt('Due (YYYY-MM-DD)', t.due||'')||t.due; const parts=prompt('Parts (comma-separated)', t.parts||'')||t.parts; t.issue=issue; t.priority=priority; t.due=due; t.parts=parts; LS.set(TICKET_KEY,tickets); render(); }
+
+  // Filters
+  document.getElementById('fStatus').addEventListener('change', render);
+  document.getElementById('fPriority').addEventListener('change', render);
+  document.getElementById('fRoom').addEventListener('input', render);
+
+  render();
+</script>
+</body>
+</html>
