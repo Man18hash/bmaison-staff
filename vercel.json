@@ -1,9 +1,5 @@
 {
-  "version": 2,
-  "name": "bmaison-staff",
-  "public": true,
-  "builds": [{ "src": "index.html", "use": "@vercel/static" }],
-  "routes": [
-    { "src": "/(.*)", "dest": "/$1" }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/$1" }
   ]
 }
